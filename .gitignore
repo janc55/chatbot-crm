@@ -1,0 +1,59 @@
+## Dependencias de Node
+node_modules/
+client/node_modules/
+.pnpm-store/
+
+## Logs y PIDs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.pid
+*.pid.lock
+
+## Archivos del sistema/editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+## Variables de entorno (mantiene .env.example)
+.env
+.env.*
+!.env.example
+
+## TypeScript y construcción
+*.tsbuildinfo
+
+## Artefactos de build (NestJS y Vite)
+dist/
+client/dist/
+
+## Cachés de Vite
+.vite/
+client/.vite/
+
+## Caché de ESLint
+.eslintcache
+client/.eslintcache
+
+## Cobertura y NYC
+coverage/
+.nyc_output/
+
+## Temporales
+tmp/
+temp/
+
+## Prisma (BD local)
+prisma/*.db
+prisma/*.db-journal
+
+## Sesiones de WhatsApp (runtime)
+wa_sessions/
+
+## Docker/Coolify (archivos locales opcionales)
+docker-compose.override.yml

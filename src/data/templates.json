@@ -1,0 +1,146 @@
+[
+    {
+        "key": "bienvenida",
+        "category": "info_general",
+        "content": "¡Hola! Bienvenido a la Universidad UNIOR. Soy tu asistente virtual. Cuéntame, ¿en qué carrera estás interesado?",
+        "attachments": null
+    },
+    {
+        "key": "brochure_medicina",
+        "category": "brochure",
+        "content": "Excelente elección. La carrera de Medicina en UNIOR es referente nacional. Aquí tienes el plan de estudios.",
+        "attachments": "[\"assets/medicina.pdf\"]",
+        "followUpSuggested": true
+    },
+    {
+        "key": "costos_medicina",
+        "category": "costos",
+        "content": "La matrícula para Medicina es de $X y la mensualidad de $Y. Tenemos planes de becas disponibles.",
+        "attachments": null,
+        "followUpSuggested": true
+    },
+    {
+        "key": "necesita_asesor",
+        "category": "system",
+        "content": "Entiendo. Tu consulta requiere atención personalizada. Un asesor se comunicará contigo en breve.",
+        "attachments": null
+    },
+    {
+        "key": "brochure_derecho",
+        "category": "brochure",
+        "content": "La Facultad de Derecho de UNIOR forma líderes con justicia. Aquí tienes el plan de estudios.",
+        "attachments": "[\"assets/derecho.pdf\"]",
+        "followUpSuggested": true
+    },
+    {
+        "key": "costos_derecho",
+        "category": "costos",
+        "content": "La carrera de Derecho tiene una inversión mensual de $Z. ¡Pregunta por nuestros descuentos!",
+        "attachments": null,
+        "followUpSuggested": true
+    },
+    {
+        "key": "seguimiento",
+        "category": "seguimiento",
+        "content": "Hola, vi que te interesaste por nuestra oferta académica. ¿Tienes alguna duda adicional o te gustaría iniciar tu inscripción hoy mismo?",
+        "attachments": null
+    },
+    {
+        "key": "brochure_administracion",
+        "category": "brochure",
+        "content": "La carrera de Administración de Empresas forma líderes estratégicos. Aquí tienes el plan de estudios.",
+        "attachments": "[\"assets/ADM-EMPRESAS.pdf\"]",
+        "followUpSuggested": true
+    },
+    {
+        "key": "costos_administracion",
+        "category": "costos",
+        "content": "La carrera de Administración de Empresas tiene una inversión mensual de $X. ¡Contáctanos para más detalles!",
+        "attachments": null,
+        "followUpSuggested": true
+    },
+    {
+        "key": "brochure_auditoria",
+        "category": "brochure",
+        "content": "La carrera de Auditoría te prepara para el mundo financiero. Descarga el plan de estudios aquí.",
+        "attachments": "[\"assets/AUDITORIA.pdf\"]",
+        "followUpSuggested": true
+    },
+    {
+        "key": "costos_auditoria",
+        "category": "costos",
+        "content": "Estudiar Auditoría es una gran inversión. La mensualidad es de $X.",
+        "attachments": null,
+        "followUpSuggested": true
+    },
+    {
+        "key": "brochure_enfermeria",
+        "category": "brochure",
+        "content": "Enfermería es una vocación de servicio. Conoce nuestro plan de estudios.",
+        "attachments": "[\"assets/ENFERMERIA.pdf\"]",
+        "followUpSuggested": true
+    },
+    {
+        "key": "costos_enfermeria",
+        "category": "costos",
+        "content": "La mensualidad de Enfermería es de $X. Tenemos opciones de pago.",
+        "attachments": null,
+        "followUpSuggested": true
+    },
+    {
+        "key": "brochure_gastronomia",
+        "category": "brochure",
+        "content": "Conviértete en un Chef profesional con nuestra carrera de Gastronomía. Mira el plan de estudios.",
+        "attachments": "[\"assets/GASTRONOMIA.pdf\"]",
+        "followUpSuggested": true
+    },
+    {
+        "key": "costos_gastronomia",
+        "category": "costos",
+        "content": "Gastronomía incluye insumos en su mensualidad de $X.",
+        "attachments": null,
+        "followUpSuggested": true
+    },
+    {
+        "key": "brochure_sistemas",
+        "category": "brochure",
+        "content": "Domina la tecnología con Ingeniería de Sistemas. Aquí está el pénsum.",
+        "attachments": "[\"assets/ING-SISTEMAS.pdf\"]",
+        "followUpSuggested": true
+    },
+    {
+        "key": "costos_sistemas",
+        "category": "costos",
+        "content": "Ingeniería de Sistemas tiene una mensualidad de $X.",
+        "attachments": null,
+        "followUpSuggested": true
+    },
+    {
+        "key": "brochure_odontologia",
+        "category": "brochure",
+        "content": "Odontología de excelencia. Revisa nuestro plan curricular.",
+        "attachments": "[\"assets/ODONTOLOGIA.pdf\"]",
+        "followUpSuggested": true
+    },
+    {
+        "key": "costos_odontologia",
+        "category": "costos",
+        "content": "La inversión en Odontología es de $X mensuales.",
+        "attachments": null,
+        "followUpSuggested": true
+    },
+    {
+        "key": "brochure_protesis",
+        "category": "brochure",
+        "content": "Especialízate en Prótesis Dental. Descarga la información aquí.",
+        "attachments": "[\"assets/PROTESIS-DENTAL.pdf\"]",
+        "followUpSuggested": true
+    },
+    {
+        "key": "costos_protesis",
+        "category": "costos",
+        "content": "La carrera de Prótesis Dental tiene un costo mensual de $X.",
+        "attachments": null,
+        "followUpSuggested": true
+    }
+]

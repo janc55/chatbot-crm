@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Lead {
+  id              String        @id @default(uuid())
+  phone           String        @unique
+  fullName        String?       @map("full_name")
+  careerInterest  String?       @map("career_interest")
+  source          String        @default("unknown")
+  status          LeadStatus    @default(NUEVO)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  isHandoverActive Boolean      @default(false) @map("is_handover_active")
+  interactions    Interaction[]
+
+  @@map("leads")
+}
+
+model Interaction {
+  id          String          @id @default(uuid())
+  leadId      String          @map("lead_id")
+  direction   Direction
+  messageType MessageType     @map("message_type")
+  content     String
+  templateKey String?         @map("template_key")
+  usedAi      Boolean         @default(false) @map("used_ai")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  lead        Lead            @relation(fields: [leadId], references: [id])
+
+  @@map("interactions")
+}
+
+model Template {
+  id                String   @id @default(uuid())
+  key               String   @unique
+  category          String
+  language          String   @default("es")
+  content           String
+  attachments       String?  // JSON string or URL
+  followUpSuggested Boolean  @default(false) @map("follow_up_suggested")
+  embedding         Json?    // Vector de OpenAI almacenado como JSON array
+  
+  @@map("templates")
+}
+
+enum LeadStatus {
+  NUEVO
+  INTERESADO_BROCHURE
+  INTERESADO_COSTOS
+  PREINSCRITO
+  INSCRITO
+  DESCARTADO
+  NECESITA_ASESOR
+  PREINSCRIPCION_EN_PROCESO
+}
+
+enum Direction {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageType {
+  TEXT
+  MEDIA
+  TEMPLATE
+}
