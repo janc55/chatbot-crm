@@ -59,3 +59,33 @@
     - [x] WhatsApp processing flow (Mock Baileys)
 - [x] Load Testing (Optional) <!-- id: 31 -->
     - [x] Script `scripts/load-test.js` created and verified.
+
+## Phase 8: Chatbot Behavior Enhancements
+- [x] Implement Message Delays (Typing Simulation) <!-- id: 32 -->
+    - [x] Backend: Add configurable delay settings (min/max delay, typing speed)
+    - [x] Backend: Implement delay logic in message sending
+    - [x] Frontend: Settings panel for delay configuration
+    - [x] Frontend: Real-time preview of delay behavior
+- [x] Advanced Chatbot Settings <!-- id: 33 -->
+    - [x] Auto-responses toggle (enable/disable bot)
+    - [x] Working hours configuration
+    - [x] Custom greeting messages
+    - [x] Response templates priority settings
+    - [x] AI confidence threshold for fallback responses
+
+## Phase 9: Additional Features
+- [ ] Implement Notifications and Alerts <!-- id: 34 -->
+    - [ ] Backend: Email notification service (Nodemailer)
+    - [ ] Backend: In-app alerts for admins (WebSocket/SSE)
+    - [ ] Frontend: Notification center in dashboard
+    - [ ] Alerts for new leads, handover requests, system errors
+- [ ] Implement Reports (without sentiment analysis) <!-- id: 35 -->
+    - [ ] Backend: Report generation endpoints (PDF/Excel export)
+    - [ ] Backend: Interaction reports (daily/weekly/monthly stats)
+    - [ ] Backend: Lead conversion reports
+    - [ ] Frontend: Report dashboard with filters and charts
+- [ ] Advanced Personalization - Dynamic Templates <!-- id: 36 -->
+    - [ ] Backend: Template variable system ({{name}}, {{career}}, etc.)
+    - [ ] Backend: Dynamic content insertion in responses
+    - [ ] Frontend: Template editor with variable placeholders
+    - [ ] Database: Update template schema for dynamic fields

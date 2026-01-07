@@ -49,6 +49,18 @@ model Template {
   @@map("templates")
 }
 
+model Setting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  category    String   @default("general")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
 enum LeadStatus {
   NUEVO
   INTERESADO_BROCHURE

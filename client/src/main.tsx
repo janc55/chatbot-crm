@@ -6,6 +6,7 @@ import Dashboard from './Dashboard';
 import Leads from './Leads';
 import LeadDetail from './LeadDetail';
 import Templates from './Templates';
+import Settings from './Settings';
 import WhatsAppConnect from './WhatsAppConnect';
 import api from './api';
 import './index.css';
@@ -53,6 +54,7 @@ function App() {
           <Route path="leads" element={<Leads />} />
           <Route path="leads/:id" element={<LeadDetail />} />
           <Route path="templates" element={<Templates />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </BrowserRouter>

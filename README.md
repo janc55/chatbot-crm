@@ -247,7 +247,34 @@ npm run ts-node scripts/load-test.js
 
 # Verificar plantillas
 npm run ts-node scripts/check-templates.ts
+
+# Inicializar configuraciones por defecto
+npm run settings:init
 ```
+
+## ⚙️ Configuraciones del Chatbot
+
+El sistema incluye un panel de configuraciones avanzadas accesible desde `/settings` que permite personalizar:
+
+### Simulación de Escritura
+- **Delays configurables**: Tiempo base aleatorio (800-2000ms) + bonus por longitud
+- **Velocidad de escritura**: Bonus adicional limitado a 2 segundos máximo
+- **Cálculo**: Delay total = delay_base_aleatorio + min(longitud_mensaje / velocidad_escritura, 2000ms)
+- **Toggle de activación**: Habilitar/deshabilitar delays completamente
+
+### Respuestas Automáticas
+- **Control de activación**: Encender/apagar el bot completamente
+- **Horarios de trabajo**: Restringir respuestas a ciertos horarios
+- **Mensaje de bienvenida**: Personalizar saludo inicial
+
+### Configuración de IA
+- **Umbral de confianza**: Controlar cuándo usar respuestas de IA vs templates
+- **Fallback inteligente**: Comportamiento cuando no hay coincidencias exactas
+
+### Gestión de Conexión
+- **Conexión desde frontend**: QR code y control de sesión
+- **Desconexión remota**: Cerrar sesión desde la interfaz web
+- **Estado en tiempo real**: Monitoreo de conexión WhatsApp
 
 ## 🤝 Contribución
 

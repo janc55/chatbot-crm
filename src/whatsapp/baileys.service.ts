@@ -11,6 +11,7 @@ import * as qrcode from 'qrcode-terminal';
 import * as path from 'path';
 import * as fs from 'fs';
 import { WhatsappService } from './whatsapp.service';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class BaileysService implements OnModuleInit, OnModuleDestroy {
@@ -26,7 +27,12 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
     constructor(
         @Inject(forwardRef(() => WhatsappService))
         private readonly whatsappService: WhatsappService,
-    ) { }
+        private readonly settingsService: SettingsService,
+    ) {
+        this.logger.log('[DEBUG] BaileysService constructor called');
+        this.logger.log('[DEBUG] WhatsappService injected:', !!this.whatsappService);
+        this.logger.log('[DEBUG] SettingsService injected:', !!this.settingsService);
+    }
 
     async onModuleInit() {
         // Allow scripts to skip connection
@@ -34,8 +40,9 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
             this.logger.log('Skipping WhatsApp connection (SKIP_WHATSAPP_CONNECT is set)');
             return;
         }
-        // No conectar automáticamente, esperar llamada manual
-        // await this.connectToWhatsApp();
+        // Esperar un poco antes de conectar para asegurar que todos los módulos estén listos
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await this.connectToWhatsApp();
     }
 
     async onModuleDestroy() {
@@ -56,6 +63,8 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
     }
 
     async connectToWhatsApp() {
+        this.logger.log('[DEBUG] connectToWhatsApp called');
+
         // Evitar múltiples conexiones simultáneas
         if (this.isConnecting) {
             this.logger.warn('Ya hay una conexión en progreso, esperando...');
@@ -72,6 +81,7 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
         }
 
         this.isConnecting = true;
+        this.logger.log('[DEBUG] Starting WhatsApp connection process');
 
         try {
             const sessionPath = process.env.WHATSAPP_SESSION_PATH || './wa_sessions';
@@ -205,8 +215,13 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
 
             // Manejar mensajes entrantes
             this.sock.ev.on('messages.upsert', async (m) => {
+                this.logger.log('[DEBUG] messages.upsert event received:', { type: m.type, messagesCount: m.messages?.length });
+
                 try {
-                    if (m.type !== 'notify') return;
+                    if (m.type !== 'notify') {
+                        this.logger.log('[DEBUG] Ignoring non-notify message type');
+                        return;
+                    }
 
                     for (const msg of m.messages) {
                         // Ignorar mensajes propios y de grupos (si no se manejan grupos)
@@ -308,6 +323,8 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
     }
 
     async sendMessage(to: string, content: AnyMessageContent) {
+        this.logger.log(`[DEBUG] sendMessage called for ${to}`);
+
         if (!this.sock) {
             this.logger.warn('Socket no inicializado, no se puede enviar mensaje');
             throw new Error('Socket no inicializado');
@@ -327,11 +344,29 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
                 }
             }
 
+            this.logger.log(`[DEBUG] About to apply message delay`);
+
+            // Aplicar delay si está habilitado
+            await this.applyMessageDelay(content);
+
+            this.logger.log(`[DEBUG] Delay applied, sending message`);
+
             await this.sock.sendMessage(to, content);
             this.logger.log(`Mensaje enviado a ${to}`);
         } catch (error) {
             this.logger.error(`Error al enviar mensaje a ${to}: ${error}`);
             throw error;
+        }
+    }
+
+    private async applyMessageDelay(content: AnyMessageContent): Promise<void> {
+        try {
+            // Simple delay without settings for now - just to test
+            const delay = Math.random() * 1000 + 500; // 500-1500ms
+            this.logger.log(`[DEBUG] Applying simple delay of ${Math.round(delay)}ms`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        } catch (error) {
+            this.logger.warn(`Error aplicando delay: ${error}`);
         }
     }
 

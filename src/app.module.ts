@@ -8,6 +8,7 @@ import { LeadsModule } from './leads/leads.module';
 import { TemplatesModule } from './templates/templates.module';
 import { InteractionsModule } from './interactions/interactions.module';
 import { TasksModule } from './tasks/tasks.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
     imports: [
@@ -22,6 +23,7 @@ import { TasksModule } from './tasks/tasks.module';
         TemplatesModule,
         InteractionsModule,
         TasksModule,
+        SettingsModule,
     ],
     controllers: [],
     providers: [],

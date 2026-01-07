@@ -75,6 +75,16 @@ export default function Layout() {
                                 >
                                     Templates
                                 </Link>
+                                <Link 
+                                    to="/settings" 
+                                    className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${
+                                        isActive('/settings') 
+                                            ? 'bg-[#A7CF3B] text-[#064A6F]' 
+                                            : 'text-white hover:bg-[#0a5a87]'
+                                    }`}
+                                >
+                                    Settings
+                                </Link>
                             </div>
                         </div>
                     </div>

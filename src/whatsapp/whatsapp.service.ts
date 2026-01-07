@@ -21,7 +21,13 @@ export class WhatsappService {
         private interactionsService: InteractionsService,
         private templatesService: TemplatesService,
         private openaiService: OpenaiService,
-    ) { }
+    ) {
+        this.logger.log('[DEBUG] WhatsappService constructor called');
+        this.logger.log('[DEBUG] BaileysService injected:', !!this.baileysService);
+        this.logger.log('[DEBUG] LeadsService injected:', !!this.leadsService);
+        this.logger.log('[DEBUG] TemplatesService injected:', !!this.templatesService);
+        this.logger.log('[DEBUG] OpenAIService injected:', !!this.openaiService);
+    }
 
     async sendFollowUp(lead: any, template: any) {
         // Convertir el número de teléfono a JID completo para enviar mensajes
@@ -35,6 +41,8 @@ export class WhatsappService {
 
     async processMessage(data: { remoteJid: string; phoneNumber?: string; text: string; name?: string; messageId: string }) {
         const { remoteJid, phoneNumber: phoneNumberFromData, text, name, messageId } = data;
+
+        this.logger.log(`[DEBUG] processMessage called with data:`, { remoteJid, phoneNumberFromData, text: text.substring(0, 50), messageId });
 
         // Deduplication Logic
         if (this.processedMessages.has(messageId)) {
@@ -179,6 +187,8 @@ export class WhatsappService {
     }
 
     private async sendResponse(remoteJid: string, response: any, lead: any) {
+        this.logger.log(`[DEBUG] sendResponse called for ${remoteJid} with response:`, { text: response.text?.substring(0, 50), templateKey: response.templateKey });
+
         if (response.attachments && response.attachments.length > 0) {
             const attachmentPath = response.attachments[0];
             const isUrl = attachmentPath.startsWith('http');
