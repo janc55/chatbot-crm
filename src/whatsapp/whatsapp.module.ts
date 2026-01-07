@@ -7,9 +7,10 @@ import { InteractionsModule } from '../interactions/interactions.module';
 import { TemplatesModule } from '../templates/templates.module';
 import { OpenaiModule } from '../openai/openai.module';
 import { SettingsModule } from '../settings/settings.module';
+import { LogsModule } from '../logs/logs.module';
 
 @Module({
-    imports: [LeadsModule, InteractionsModule, TemplatesModule, OpenaiModule, SettingsModule],
+    imports: [LeadsModule, InteractionsModule, TemplatesModule, OpenaiModule, SettingsModule, LogsModule],
     providers: [WhatsappService, BaileysService],
     controllers: [WhatsappController],
     exports: [WhatsappService, BaileysService],

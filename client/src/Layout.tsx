@@ -85,6 +85,16 @@ export default function Layout() {
                                 >
                                     Settings
                                 </Link>
+                                <Link 
+                                    to="/logs" 
+                                    className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${
+                                        isActive('/logs') 
+                                            ? 'bg-[#A7CF3B] text-[#064A6F]' 
+                                            : 'text-white hover:bg-[#0a5a87]'
+                                    }`}
+                                >
+                                    Logs
+                                </Link>
                             </div>
                         </div>
                     </div>

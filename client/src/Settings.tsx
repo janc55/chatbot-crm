@@ -70,6 +70,11 @@ export default function Settings() {
     }
   };
 
+  const updateSetting = <K extends keyof ChatbotSettings>(key: K, value: ChatbotSettings[K]) => {
+    if (!settings) return;
+    setSettings({ ...settings, [key]: value });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">

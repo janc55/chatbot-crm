@@ -80,13 +80,6 @@ export default function WhatsAppConnect({ onConnected }: WhatsAppConnectProps) {
                     <p className="text-gray-600">Conecta tu chatbot universitario con WhatsApp</p>
                 </div>
 
-                {botInfo?.status === 'connecting' && (
-                    <div className="text-center mb-6">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#064A6F] mx-auto mb-2"></div>
-                        <p className="text-sm text-gray-600">Conectando...</p>
-                    </div>
-                )}
-
                 {botInfo?.qr && (
                     <div className="text-center mb-6">
                         <p className="text-sm text-gray-600 mb-4">Escanea este código QR con WhatsApp:</p>

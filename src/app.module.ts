@@ -9,6 +9,7 @@ import { TemplatesModule } from './templates/templates.module';
 import { InteractionsModule } from './interactions/interactions.module';
 import { TasksModule } from './tasks/tasks.module';
 import { SettingsModule } from './settings/settings.module';
+import { LogsModule } from './logs/logs.module';
 
 @Module({
     imports: [
@@ -24,6 +25,7 @@ import { SettingsModule } from './settings/settings.module';
         InteractionsModule,
         TasksModule,
         SettingsModule,
+        LogsModule,
     ],
     controllers: [],
     providers: [],

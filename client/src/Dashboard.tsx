@@ -32,7 +32,20 @@ export default function Dashboard() {
         // Recupere estado de bot (GET /webhook/whatsapp/status)
         // Nota: Si el bot no está conectado, devuelve null o status disconnected
         api.get('/webhook/whatsapp/status')
-            .then(res => setBotInfo(res.data))
+            .then(async (res) => {
+                setBotInfo(res.data);
+                // Si el bot está conectado, intentar obtener la imagen de perfil
+                if (res.data && res.data.status === 'connected') {
+                    try {
+                        const profileRes = await api.get('/webhook/whatsapp/profile-picture');
+                        if (profileRes.data.profilePicture) {
+                            setBotInfo((prev: any) => prev ? { ...prev, profilePicUrl: profileRes.data.profilePicture } : null);
+                        }
+                    } catch (error) {
+                        console.warn('No se pudo obtener la imagen de perfil:', error);
+                    }
+                }
+            })
             .catch(err => console.error("Error fetching bot info", err));
     }, []);
 

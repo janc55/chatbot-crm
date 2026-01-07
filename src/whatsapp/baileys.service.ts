@@ -12,6 +12,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { WhatsappService } from './whatsapp.service';
 import { SettingsService } from '../settings/settings.service';
+import { LogsService } from '../logs/logs.service';
 
 @Injectable()
 export class BaileysService implements OnModuleInit, OnModuleDestroy {
@@ -28,6 +29,7 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
         @Inject(forwardRef(() => WhatsappService))
         private readonly whatsappService: WhatsappService,
         private readonly settingsService: SettingsService,
+        private readonly logsService: LogsService,
     ) {
         this.logger.log('[DEBUG] BaileysService constructor called');
         this.logger.log('[DEBUG] WhatsappService injected:', !!this.whatsappService);
@@ -162,43 +164,28 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
                     this.isConnecting = false;
                     this.isConnected = false;
                     const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
-                    const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
                     // Log detallado del error
                     if (lastDisconnect?.error) {
                         this.logger.error(`Error de conexión: ${lastDisconnect.error}`);
+                        this.logsService.addLog('error', `WhatsApp connection error: ${lastDisconnect.error}`, 'BaileysService');
                     }
 
                     this.logger.error(
-                        `Conexión cerrada. Razón: ${statusCode || 'unknown'}. Reconectando: ${shouldReconnect}`,
+                        `Conexión cerrada. Razón: ${statusCode || 'unknown'}.`,
                     );
 
-                    if (statusCode === DisconnectReason.loggedOut) {
-                        this.logger.warn('Sesión cerrada. Necesitas escanear el QR nuevamente.');
-                        // Limpiar sesión si fue cerrada
-                        const sessionPath = process.env.WHATSAPP_SESSION_PATH || './wa_sessions';
-                        if (fs.existsSync(sessionPath)) {
-                            const files = fs.readdirSync(sessionPath);
-                            for (const file of files) {
-                                fs.unlinkSync(path.join(sessionPath, file));
-                            }
-                            this.logger.log('Sesión limpiada. Reinicia la aplicación para obtener un nuevo QR.');
-                        }
-                    } else if (shouldReconnect) {
-                        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                            this.reconnectAttempts++;
-                            this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, 30000); // Backoff exponencial, máximo 30s
-                            this.logger.log(
-                                `Reintentando conexión en ${this.reconnectDelay / 1000} segundos (intento ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`,
-                            );
-                            setTimeout(() => {
-                                this.connectToWhatsApp();
-                            }, this.reconnectDelay);
-                        } else {
-                            this.logger.error(
-                                `Máximo de intentos de reconexión alcanzado (${this.maxReconnectAttempts}). Por favor reinicia la aplicación.`,
-                            );
-                        }
+                    // Para cualquier desconexión, intentar reconectar una vez
+                    if (this.reconnectAttempts < 1) {
+                        this.reconnectAttempts++;
+                        this.logger.log(`Intentando reconectar... (intento ${this.reconnectAttempts})`);
+                        this.logsService.addLog('log', `Retrying connection (attempt ${this.reconnectAttempts})`, 'BaileysService');
+                        setTimeout(() => {
+                            this.connectToWhatsApp();
+                        }, 5000);
+                    } else {
+                        this.logger.error('Máximo de intentos de reconexión alcanzado. Reinicia la aplicación manualmente.');
+                        this.logsService.addLog('error', 'Max reconnection attempts reached. Please restart manually.', 'BaileysService');
                     }
                 }
             });
@@ -361,12 +348,34 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
 
     private async applyMessageDelay(content: AnyMessageContent): Promise<void> {
         try {
-            // Simple delay without settings for now - just to test
-            const delay = Math.random() * 1000 + 500; // 500-1500ms
-            this.logger.log(`[DEBUG] Applying simple delay of ${Math.round(delay)}ms`);
-            await new Promise(resolve => setTimeout(resolve, delay));
+            // Get current settings from database
+            const settings = await this.settingsService.getChatbotSettings();
+
+            // Check if delays are enabled
+            if (!settings.messageDelayEnabled) {
+                this.logger.log(`[DEBUG] Message delays disabled, skipping delay`);
+                return;
+            }
+
+            // Calculate delay based on settings
+            const baseDelay = Math.random() * (settings.messageDelayMax - settings.messageDelayMin) + settings.messageDelayMin;
+
+            // Add typing simulation delay based on message length
+            let typingDelay = 0;
+            if ('text' in content && typeof content.text === 'string') {
+                const textLength = content.text.length;
+                typingDelay = (textLength / settings.typingSpeed) * 1000; // Convert to milliseconds
+            }
+
+            const totalDelay = baseDelay + typingDelay;
+
+            this.logger.log(`[DEBUG] Applying delay: base=${Math.round(baseDelay)}ms, typing=${Math.round(typingDelay)}ms, total=${Math.round(totalDelay)}ms`);
+            await new Promise(resolve => setTimeout(resolve, totalDelay));
         } catch (error) {
-            this.logger.warn(`Error aplicando delay: ${error}`);
+            this.logger.warn(`Error aplicando delay, usando delay por defecto: ${error}`);
+            // Fallback to simple delay if settings fail
+            const delay = Math.random() * 1000 + 500; // 500-1500ms
+            await new Promise(resolve => setTimeout(resolve, delay));
         }
     }
 
@@ -458,36 +467,6 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
         }
     }
 
-    async getBotInfo() {
-        if (!this.sock || !this.isConnected || !this.sock.user) {
-            return {
-                status: this.isConnecting ? 'connecting' : 'disconnected',
-                name: null,
-                phone: null,
-                profilePicUrl: null,
-                qr: this.currentQr
-            };
-        }
-
-        const user = this.sock.user;
-        let profilePicUrl = null;
-
-        try {
-            // "image" returns high res, "preview" low res.
-            profilePicUrl = await this.sock.profilePictureUrl(user.id, 'image');
-        } catch (e) {
-            this.logger.warn(`Could not fetch profile picture for bot: ${e}`);
-        }
-
-        return {
-            status: 'connected',
-            name: user.name || user.notify || 'Chatbot',
-            phone: user.id.split(':')[0],
-            profilePicUrl,
-            qr: null
-        };
-    }
-
     async startConnection() {
         if (this.isConnected) {
             return { success: false, message: 'Ya está conectado' };
@@ -517,6 +496,48 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
         } catch (error) {
             this.logger.error(`Error al cerrar sesión: ${error}`);
             return { success: false, message: 'Error al cerrar sesión' };
+        }
+    }
+
+    getBotInfo() {
+        const baseInfo = {
+            status: this.isConnected ? 'connected' : (this.isConnecting ? 'connecting' : 'disconnected'),
+            qr: this.currentQr,
+            reconnectAttempts: this.reconnectAttempts,
+        };
+
+        // Si está conectado, obtener información del perfil del bot
+        if (this.isConnected && this.sock?.user) {
+            const user = this.sock.user;
+            return {
+                ...baseInfo,
+                name: user.name || user.notify || 'Chatbot',
+                phone: user.id ? user.id.split('@')[0] : 'unknown number',
+                profilePicUrl: null, // Se obtendrá de forma asíncrona si es necesario
+            };
+        }
+
+        // Si no está conectado, devolver información básica
+        return {
+            ...baseInfo,
+            name: 'Chatbot',
+            phone: 'unknown number',
+            profilePicUrl: null,
+        };
+    }
+
+    async getBotProfilePicture(): Promise<string | null> {
+        if (!this.isConnected || !this.sock?.user?.id) {
+            return null;
+        }
+
+        try {
+            // En Baileys v6, se puede usar el método del socket para obtener la imagen de perfil
+            const profilePictureUrl = await this.sock.profilePictureUrl(this.sock.user.id, 'image');
+            return profilePictureUrl;
+        } catch (error) {
+            this.logger.warn(`No se pudo obtener la imagen de perfil del bot: ${error}`);
+            return null;
         }
     }
 }

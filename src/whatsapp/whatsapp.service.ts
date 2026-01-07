@@ -4,6 +4,7 @@ import { LeadsService } from '../leads/leads.service';
 import { InteractionsService } from '../interactions/interactions.service';
 import { TemplatesService } from '../templates/templates.service';
 import { OpenaiService } from '../openai/openai.service';
+import { LogsService } from '../logs/logs.service';
 import { LeadStatus, Direction, MessageType } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -21,6 +22,7 @@ export class WhatsappService {
         private interactionsService: InteractionsService,
         private templatesService: TemplatesService,
         private openaiService: OpenaiService,
+        private logsService: LogsService,
     ) {
         this.logger.log('[DEBUG] WhatsappService constructor called');
         this.logger.log('[DEBUG] BaileysService injected:', !!this.baileysService);
@@ -61,10 +63,12 @@ export class WhatsappService {
 
         if (!phoneToSave) {
             this.logger.error(`CRITICAL: No phone number provided for remoteJid: ${remoteJid}`);
+            this.logsService.addLog('error', `No phone number provided for message from ${remoteJid}`, 'WhatsappService');
             // Intentar extraer del remoteJid como último recurso
             phoneToSave = this.extractPhoneFromJid(remoteJid);
             if (!phoneToSave || phoneToSave.length < 8) {
                 this.logger.error(`CRITICAL: Cannot extract valid phone number from ${remoteJid}`);
+                this.logsService.addLog('error', `Cannot extract valid phone number from ${remoteJid}`, 'WhatsappService');
                 return; // No procesar si no tenemos un número válido
             }
         }
@@ -98,6 +102,9 @@ export class WhatsappService {
         // 4. Send Response
         if (response) {
             await this.sendResponse(remoteJid, response, lead);
+            this.logsService.addLog('log', `Bot response sent to ${remoteJid}: ${response.text?.substring(0, 100)}...`, 'WhatsappService');
+        } else {
+            this.logsService.addLog('warn', `No response generated for message from ${remoteJid}`, 'WhatsappService');
         }
     }
 
@@ -258,6 +265,10 @@ export class WhatsappService {
 
     async getBotStatus() {
         return this.baileysService.getBotInfo();
+    }
+
+    async getBotProfilePicture() {
+        return this.baileysService.getBotProfilePicture();
     }
 
     async startConnection() {

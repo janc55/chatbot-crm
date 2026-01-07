@@ -23,6 +23,13 @@ export class WhatsappController {
         return this.whatsappService.getBotStatus();
     }
 
+    @Get('profile-picture')
+    @ApiOperation({ summary: 'Get WhatsApp Bot Profile Picture URL' })
+    async getProfilePicture() {
+        const profilePictureUrl = await this.whatsappService.getBotProfilePicture();
+        return { profilePicture: profilePictureUrl };
+    }
+
     @Post('connect')
     @HttpCode(200)
     @ApiOperation({ summary: 'Start WhatsApp connection and generate QR' })
