@@ -21,6 +21,7 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
     private reconnectAttempts = 0;
     private readonly maxReconnectAttempts = 5;
     private reconnectDelay = 5000; // 5 segundos inicial
+    private currentQr: string | null = null;
 
     constructor(
         @Inject(forwardRef(() => WhatsappService))
@@ -28,9 +29,13 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
     ) { }
 
     async onModuleInit() {
-        // Esperar un poco antes de conectar para asegurar que todos los módulos estén listos
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        await this.connectToWhatsApp();
+        // Allow scripts to skip connection
+        if (process.env.SKIP_WHATSAPP_CONNECT === 'true') {
+            this.logger.log('Skipping WhatsApp connection (SKIP_WHATSAPP_CONNECT is set)');
+            return;
+        }
+        // No conectar automáticamente, esperar llamada manual
+        // await this.connectToWhatsApp();
     }
 
     async onModuleDestroy() {
@@ -126,6 +131,7 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
                 if (qr) {
                     this.logger.log('QR Code recibido. Por favor escanea para iniciar sesión.');
                     qrcode.generate(qr, { small: true });
+                    this.currentQr = qr;
                     this.reconnectAttempts = 0; // Resetear intentos cuando hay QR
                 }
 
@@ -419,7 +425,13 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
 
     async getBotInfo() {
         if (!this.sock || !this.isConnected || !this.sock.user) {
-            return { status: 'disconnected', name: null, phone: null, profilePicUrl: null };
+            return {
+                status: this.isConnecting ? 'connecting' : 'disconnected',
+                name: null,
+                phone: null,
+                profilePicUrl: null,
+                qr: this.currentQr
+            };
         }
 
         const user = this.sock.user;
@@ -436,7 +448,40 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
             status: 'connected',
             name: user.name || user.notify || 'Chatbot',
             phone: user.id.split(':')[0],
-            profilePicUrl
+            profilePicUrl,
+            qr: null
         };
+    }
+
+    async startConnection() {
+        if (this.isConnected) {
+            return { success: false, message: 'Ya está conectado' };
+        }
+        await this.connectToWhatsApp();
+        return { success: true, message: 'Iniciando conexión...' };
+    }
+
+    async logout() {
+        if (!this.sock) {
+            return { success: false, message: 'No hay conexión activa' };
+        }
+
+        try {
+            await this.disconnect();
+            // Limpiar sesión
+            const sessionPath = process.env.WHATSAPP_SESSION_PATH || './wa_sessions';
+            if (fs.existsSync(sessionPath)) {
+                const files = fs.readdirSync(sessionPath);
+                for (const file of files) {
+                    fs.unlinkSync(path.join(sessionPath, file));
+                }
+                this.logger.log('Sesión limpiada');
+            }
+            this.currentQr = null;
+            return { success: true, message: 'Sesión cerrada exitosamente' };
+        } catch (error) {
+            this.logger.error(`Error al cerrar sesión: ${error}`);
+            return { success: false, message: 'Error al cerrar sesión' };
+        }
     }
 }

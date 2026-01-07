@@ -84,4 +84,12 @@ export class LeadsService {
             data: { isHandoverActive: status },
         });
     }
+
+    async getLastMessages(leadId: string, limit: number = 10) {
+        return this.prisma.interaction.findMany({
+            where: { leadId },
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+        });
+    }
 }

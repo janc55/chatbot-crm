@@ -6,6 +6,25 @@ export default function Dashboard() {
     const [stats, setStats] = useState<any>(null);
     const [history, setHistory] = useState<any[]>([]);
     const [botInfo, setBotInfo] = useState<any>(null);
+    const [disconnecting, setDisconnecting] = useState(false);
+
+    const handleDisconnect = async () => {
+        if (!confirm('¿Estás seguro de que quieres desconectar el bot de WhatsApp? Se perderá la sesión actual.')) {
+            return;
+        }
+
+        setDisconnecting(true);
+        try {
+            await api.post('/webhook/whatsapp/disconnect');
+            // Recargar la página para volver a la pantalla de conexión
+            window.location.reload();
+        } catch (error) {
+            console.error('Error disconnecting:', error);
+            alert('Error al desconectar');
+        } finally {
+            setDisconnecting(false);
+        }
+    };
 
     useEffect(() => {
         api.get('/leads/stats').then(res => setStats(res.data));
@@ -52,9 +71,20 @@ export default function Dashboard() {
                         <div className="text-right">
                             <p className="text-sm font-bold text-[#064A6F]">{botInfo.name || 'Chatbot'}</p>
                             <p className="text-xs text-gray-500">{botInfo.phone || 'Unknown Phone'}</p>
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold mt-1 ${botInfo.status === 'connected' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                {botInfo.status === 'connected' ? 'ONLINE' : 'OFFLINE'}
-                            </span>
+                            <div className="flex items-center justify-between mt-1">
+                                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${botInfo.status === 'connected' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                    {botInfo.status === 'connected' ? 'ONLINE' : 'OFFLINE'}
+                                </span>
+                                {botInfo.status === 'connected' && (
+                                    <button
+                                        onClick={handleDisconnect}
+                                        disabled={disconnecting}
+                                        className="ml-2 px-2 py-0.5 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white text-[10px] font-semibold rounded transition-colors duration-200"
+                                    >
+                                        {disconnecting ? '...' : 'Desconectar'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 ) : (

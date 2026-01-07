@@ -32,6 +32,7 @@ export class OpenaiService {
     async classifyMessage(
         userMessage: string,
         contextSummary: string,
+        conversationHistory: string = '',
     ): Promise<ClassificationResult> {
         try {
             const systemPrompt = `
@@ -39,7 +40,10 @@ export class OpenaiService {
       Tu tarea es CLASIFICAR el mensaje del usuario y seleccionar una plantilla de respuesta SI existe.
       NO inventes precios, fechas ni requisitos.
       
-      Contexto de plantillas disponibles (Resumen):
+      Historial de conversación reciente:
+      ${conversationHistory}
+
+      Contexto de plantillas disponibles (Resumen encontrado por RAG):
       ${contextSummary}
 
       Debes responder SIEMPRE con un JSON válido con este formato:
@@ -51,6 +55,7 @@ export class OpenaiService {
       }
       
       Si el usuario pide algo que NO está en el contexto, needs_human = true.
+      Si el usuario pide "requisitos" o "costos" y el historial o contexto implica una carrera específica, busca la plantilla específica (ej. requisitos_gth).
       `;
 
             const completion = await this.openai.chat.completions.create({

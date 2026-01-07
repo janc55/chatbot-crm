@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './Layout';
@@ -6,10 +6,46 @@ import Dashboard from './Dashboard';
 import Leads from './Leads';
 import LeadDetail from './LeadDetail';
 import Templates from './Templates';
+import WhatsAppConnect from './WhatsAppConnect';
+import api from './api';
 import './index.css';
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
+function App() {
+  const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    checkConnection();
+  }, []);
+
+  const checkConnection = async () => {
+    try {
+      const response = await api.get('/webhook/whatsapp/status');
+      setIsConnected(response.data.status === 'connected');
+    } catch (error) {
+      console.error('Error checking connection:', error);
+      setIsConnected(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#064A6F] mx-auto mb-4"></div>
+          <p className="text-[#064A6F] font-medium">Verificando conexión...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return <WhatsAppConnect onConnected={() => setIsConnected(true)} />;
+  }
+
+  return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
@@ -20,5 +56,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         </Route>
       </Routes>
     </BrowserRouter>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
   </React.StrictMode>,
 )

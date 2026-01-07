@@ -12,6 +12,8 @@ import * as path from 'path';
 export class WhatsappService {
     private readonly logger = new Logger(WhatsappService.name);
 
+    private processedMessages = new Set<string>();
+
     constructor(
         @Inject(forwardRef(() => BaileysService))
         private baileysService: BaileysService,
@@ -33,6 +35,16 @@ export class WhatsappService {
 
     async processMessage(data: { remoteJid: string; phoneNumber?: string; text: string; name?: string; messageId: string }) {
         const { remoteJid, phoneNumber: phoneNumberFromData, text, name, messageId } = data;
+
+        // Deduplication Logic
+        if (this.processedMessages.has(messageId)) {
+            this.logger.warn(`Ignoring duplicate message ID: ${messageId}`);
+            return;
+        }
+        this.processedMessages.add(messageId);
+        // Clean up cache after 15 seconds
+        setTimeout(() => this.processedMessages.delete(messageId), 15000);
+
         this.logger.log(`Processing message from ${remoteJid} (phone: ${phoneNumberFromData}): ${text}`);
 
         // 1. Find or Create Lead
@@ -117,18 +129,32 @@ export class WhatsappService {
         }
 
         // --- OPENAI FALLBACK (RAG) ---
-        // Retrieve only the most relevant templates (Top 5) based on embedding similarity
-        const topTemplates = await this.templatesService.findMostRelevant(text, 5);
+
+        // 1. Contextualize Query using Career Interest
+        let searchContext = text;
+        if (lead.careerInterest) {
+            searchContext += ` ${lead.careerInterest}`;
+        }
+
+        // Retrieve only the most relevant templates (Top 5) based on embedding similarity using contextualized query
+        const topTemplates = await this.templatesService.findMostRelevant(searchContext, 5);
 
         let context = '';
         if (topTemplates.length > 0) {
-            context = topTemplates.map(t => `- KEY: ${t.key} (Cat: ${t.category}): ${(t.content || '').substring(0, 100)}...`).join('\n');
+            context = topTemplates.map(t => `- KEY: ${t.key} (Cat: ${t.category}): ${(t.content || '').substring(0, 150)}...`).join('\n'); // Increased substring length
         } else {
-            // Fallback to general summary if no matches found (or no embeddings yet)
+            // Fallback to general summary if no matches found
             context = await this.templatesService.getContextSummary();
         }
 
-        const classification = await this.openaiService.classifyMessage(text, context);
+        // 2. Fetch Conversation History
+        const lastMessages = await this.leadsService.getLastMessages(lead.id, 6);
+        // Format history: Oldest first
+        const historyText = lastMessages.reverse().map(m =>
+            `${m.direction === 'INBOUND' ? 'Usuario' : 'Bot'}: ${m.content}`
+        ).join('\n');
+
+        const classification = await this.openaiService.classifyMessage(text, context, historyText);
 
         if (classification.needs_human) {
             await this.leadsService.updateStatus(lead.phone, LeadStatus.NECESITA_ASESOR);
@@ -222,5 +248,13 @@ export class WhatsappService {
 
     async getBotStatus() {
         return this.baileysService.getBotInfo();
+    }
+
+    async startConnection() {
+        return this.baileysService.startConnection();
+    }
+
+    async logout() {
+        return this.baileysService.logout();
     }
 }

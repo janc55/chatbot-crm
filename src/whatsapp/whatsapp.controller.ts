@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get } from '@nestjs/common';
+import { Controller, Post, Body, Get, HttpCode } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
@@ -20,12 +20,20 @@ export class WhatsappController {
     @Get('status')
     @ApiOperation({ summary: 'Get WhatsApp Bot Status & Profile Info' })
     async getStatus() {
-        // We need to access BaileysService directly or via WhatsappService.
-        // WhatsappService has BaileysService injected. 
-        // But WhatsappController injects WhatsappService. 
-        // I should expose it via WhatsappService or inject BaileysService into Controller.
-        // WhatsappModule exports BaileysService, so I can inject it here.
-        // But I need to update constructor.
         return this.whatsappService.getBotStatus();
+    }
+
+    @Post('connect')
+    @HttpCode(200)
+    @ApiOperation({ summary: 'Start WhatsApp connection and generate QR' })
+    async connect() {
+        return this.whatsappService.startConnection();
+    }
+
+    @Post('disconnect')
+    @HttpCode(200)
+    @ApiOperation({ summary: 'Disconnect and logout from WhatsApp' })
+    async disconnect() {
+        return this.whatsappService.logout();
     }
 }
