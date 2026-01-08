@@ -10,6 +10,7 @@ import Settings from './Settings';
 import Logs from './Logs';
 import WhatsAppConnect from './WhatsAppConnect';
 import Chat from './Chat';
+import QuickReplies from './QuickReplies';
 import { ChatProvider } from './context/ChatContext';
 import api from './api';
 import './index.css';
@@ -58,6 +59,7 @@ function App() {
             <Route path="leads" element={<Leads />} />
             <Route path="leads/:id" element={<LeadDetail />} />
             <Route path="chat/:leadId" element={<Chat />} />
+            <Route path="quick-replies" element={<QuickReplies />} />
             <Route path="templates" element={<Templates />} />
             <Route path="settings" element={<Settings />} />
             <Route path="logs" element={<Logs />} />
