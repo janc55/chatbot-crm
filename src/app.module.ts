@@ -10,6 +10,7 @@ import { InteractionsModule } from './interactions/interactions.module';
 import { TasksModule } from './tasks/tasks.module';
 import { SettingsModule } from './settings/settings.module';
 import { LogsModule } from './logs/logs.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
     imports: [
@@ -26,6 +27,7 @@ import { LogsModule } from './logs/logs.module';
         TasksModule,
         SettingsModule,
         LogsModule,
+        ChatModule,
     ],
     controllers: [],
     providers: [],

@@ -76,9 +76,9 @@
 ## Phase 9: CRM Chat & Advisor Tools
 - [ ] Implement Backend Chat Module (Real-time) <!-- id: 37 -->
     - [x] Create QuickReply model in Prisma
-    - [ ] Implement ChatGateway (WebSockets)
-    - [ ] Implement ChatController (History, Send, QuickReplies)
-    - [ ] Integrate with WhatsappService for sending
+    - [x] Implement ChatGateway (WebSockets)
+    - [x] Implement ChatController (History, Send, QuickReplies)
+    - [x] Integrate with WhatsappService for sending
 - [ ] Implement Frontend Chat Interface <!-- id: 38 -->
     - [ ] Add socket.io-client
     - [ ] Build ChatContext

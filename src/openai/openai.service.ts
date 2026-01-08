@@ -80,4 +80,36 @@ export class OpenaiService {
             };
         }
     }
+
+    async generateSuggestions(prompt: string): Promise<string[]> {
+        try {
+            const completion = await this.openai.chat.completions.create({
+                messages: [
+                    { role: 'system', content: 'Eres un asistente que genera sugerencias de respuestas para asesores universitarios.' },
+                    { role: 'user', content: prompt },
+                ],
+                model: 'gpt-3.5-turbo-0125',
+                temperature: 0.7,
+            });
+
+            const content = completion.choices[0].message.content;
+            // Try to parse as JSON array
+            try {
+                const parsed = JSON.parse(content);
+                if (Array.isArray(parsed)) {
+                    return parsed.slice(0, 3); // Max 3 suggestions
+                }
+            } catch {
+                // If not JSON, split by newlines
+                return content
+                    .split('\n')
+                    .filter(line => line.trim().length > 0)
+                    .slice(0, 3);
+            }
+            return [content];
+        } catch (error) {
+            this.logger.error('Error generating suggestions with OpenAI', error);
+            return [];
+        }
+    }
 }

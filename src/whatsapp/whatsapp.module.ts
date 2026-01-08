@@ -10,7 +10,7 @@ import { SettingsModule } from '../settings/settings.module';
 import { LogsModule } from '../logs/logs.module';
 
 @Module({
-    imports: [forwardRef(() => LeadsModule), InteractionsModule, TemplatesModule, OpenaiModule, SettingsModule, LogsModule],
+    imports: [forwardRef(() => LeadsModule), InteractionsModule, TemplatesModule, OpenaiModule, SettingsModule, LogsModule, forwardRef(() => require('../chat/chat.module').ChatModule)],
     providers: [WhatsappService, BaileysService],
     controllers: [WhatsappController],
     exports: [WhatsappService, BaileysService],

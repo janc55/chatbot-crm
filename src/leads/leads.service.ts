@@ -92,4 +92,10 @@ export class LeadsService {
             take: limit,
         });
     }
+
+    async findById(id: string) {
+        return this.prisma.lead.findUnique({
+            where: { id },
+        });
+    }
 }

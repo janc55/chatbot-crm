@@ -5,6 +5,7 @@ import { InteractionsService } from '../interactions/interactions.service';
 import { TemplatesService } from '../templates/templates.service';
 import { OpenaiService } from '../openai/openai.service';
 import { LogsService } from '../logs/logs.service';
+import { ChatGateway } from '../chat/chat.gateway';
 import { LeadStatus, Direction, MessageType } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -24,6 +25,8 @@ export class WhatsappService {
         private templatesService: TemplatesService,
         private openaiService: OpenaiService,
         private logsService: LogsService,
+        @Inject(forwardRef(() => ChatGateway))
+        private chatGateway: ChatGateway,
     ) {
         this.logger.log('[DEBUG] WhatsappService constructor called');
         this.logger.log('[DEBUG] BaileysService injected:', !!this.baileysService);
@@ -89,6 +92,14 @@ export class WhatsappService {
             direction: Direction.INBOUND,
             messageType: MessageType.TEXT,
             content: text,
+        });
+
+        // Emit to WebSocket clients
+        this.chatGateway.emitMessageToRoom(lead.id, {
+            direction: 'INBOUND',
+            content: text,
+            createdAt: new Date(),
+            messageType: 'TEXT',
         });
 
         // CHECK HANDOVER
