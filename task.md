@@ -73,7 +73,21 @@
     - [x] Response templates priority settings
     - [x] AI confidence threshold for fallback responses
 
-## Phase 9: Additional Features
+## Phase 9: CRM Chat & Advisor Tools
+- [ ] Implement Backend Chat Module (Real-time) <!-- id: 37 -->
+    - [x] Create QuickReply model in Prisma
+    - [ ] Implement ChatGateway (WebSockets)
+    - [ ] Implement ChatController (History, Send, QuickReplies)
+    - [ ] Integrate with WhatsappService for sending
+- [ ] Implement Frontend Chat Interface <!-- id: 38 -->
+    - [ ] Add socket.io-client
+    - [ ] Build ChatContext
+    - [ ] Build Chat Page & Components (MessageList, Input)
+- [ ] Implement Advisor Assistance Features <!-- id: 39 -->
+    - [ ] Quick Replies (UI & API)
+    - [ ] AI Response Suggestions (UI & API)
+
+## Phase 10: Additional Features
 - [ ] Implement Notifications and Alerts <!-- id: 34 -->
     - [ ] Backend: Email notification service (Nodemailer)
     - [ ] Backend: In-app alerts for admins (WebSocket/SSE)

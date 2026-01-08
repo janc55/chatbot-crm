@@ -82,3 +82,14 @@ enum MessageType {
   MEDIA
   TEMPLATE
 }
+
+model QuickReply {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  category  String   @default("general")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("quick_replies")
+}

@@ -26,6 +26,12 @@
         "attachments": null
     },
     {
+        "key": "follow_up_no_response",
+        "category": "system",
+        "content": "Hola! ¿Sigues interesado en información sobre nuestras carreras? Un asesor estará disponible pronto para atenderte personalmente.",
+        "attachments": null
+    },
+    {
         "key": "brochure_derecho",
         "category": "brochure",
         "content": "La Facultad de Derecho de UNIOR forma líderes con justicia. Aquí tienes el plan de estudios.",

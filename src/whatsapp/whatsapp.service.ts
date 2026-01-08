@@ -14,6 +14,7 @@ export class WhatsappService {
     private readonly logger = new Logger(WhatsappService.name);
 
     private processedMessages = new Set<string>();
+    private handoverTimeouts = new Map<string, NodeJS.Timeout>(); // leadId -> timeout
 
     constructor(
         @Inject(forwardRef(() => BaileysService))
@@ -91,8 +92,15 @@ export class WhatsappService {
         });
 
         // CHECK HANDOVER
+        // CHECK HANDOVER
         if (lead.isHandoverActive) {
-            this.logger.log(`Skipping bot response for ${remoteJid} (Handover Active)`);
+            this.logsService.addLog('log', `Message received from ${lead.phone} while Handover is ACTIVE. Bot is silent.`, 'WhatsappService');
+            this.logger.log(`[HANDOVER ACTIVE] Message from ${remoteJid} ignored by bot. Waiting for advisor.`);
+            // STOP PROCESSING - Do NOT auto-cancel handover on user message
+            // Handover can only be cancelled by:
+            // 1. Advisor sending a message (sendAdvisorMessage)
+            // 2. Advisor clicking "Stop Handover" (API)
+            // 3. Timeout (30 mins)
             return;
         }
 
@@ -171,8 +179,26 @@ export class WhatsappService {
 
         const classification = await this.openaiService.classifyMessage(text, context, historyText);
 
-        if (classification.needs_human) {
+        if (classification.needs_human || !classification.template_key) {
+            // Activar handover automático
+            await this.leadsService.toggleHandover(lead.id, true);
             await this.leadsService.updateStatus(lead.phone, LeadStatus.NECESITA_ASESOR);
+
+            // Generar alerta para el asesor
+            this.logsService.addHandoverAlert(
+                lead.id,
+                lead.phone,
+                lead.fullName,
+                `Lead necesita asistencia humana. Mensaje: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`
+            );
+
+            // Notificar sobre el handover
+            this.logsService.addLog('log', `Handover activated for lead ${lead.phone} (${lead.fullName || 'Unknown'}) - Reason: ${classification.needs_human ? 'AI Flag' : 'No Template Matched'}`, 'WhatsappService');
+
+            // Programar reactivación automática en 30 minutos si no hay respuesta del asesor
+            const remoteJidForTimeout = lead.phone.includes('@') ? lead.phone : `${lead.phone}@s.whatsapp.net`;
+            this.scheduleHandoverTimeout(lead.id, remoteJidForTimeout);
+
             const t = await this.templatesService.findByKey('necesita_asesor');
             return t ? { text: t.content, templateKey: t.key } : { text: "Un asesor te contactará.", templateKey: 'fallback' };
         }
@@ -190,6 +216,7 @@ export class WhatsappService {
             }
         }
 
+        // Should not happen due to the first if, but just in case
         return null;
     }
 
@@ -277,5 +304,59 @@ export class WhatsappService {
 
     async logout() {
         return this.baileysService.logout();
+    }
+
+    private scheduleHandoverTimeout(leadId: string, remoteJid: string) {
+        // Cancelar cualquier timeout existente para este lead
+        this.cancelHandoverTimeout(leadId);
+
+        // Programar reactivación en 30 minutos (1800000 ms)
+        const timeout = setTimeout(async () => {
+            try {
+                // Verificar si el handover sigue activo
+                const lead = await this.leadsService.findOrCreate(remoteJid.split('@')[0], 'Unknown');
+                if (lead && lead.isHandoverActive) {
+                    // Reactivar el bot
+                    await this.leadsService.toggleHandover(leadId, false);
+
+                    // Enviar mensaje de seguimiento
+                    const followUpTemplate = await this.templatesService.findByKey('follow_up_no_response');
+                    const message = followUpTemplate
+                        ? followUpTemplate.content
+                        : "Hola! ¿Sigues interesado en información sobre nuestras carreras? Un asesor estará disponible pronto.";
+
+                    await this.sendResponse(remoteJid, { text: message, templateKey: 'follow_up' }, lead);
+
+                    this.logsService.addLog('log', `Handover timeout reached for lead ${lead.phone}, bot reactivated`, 'WhatsappService');
+                }
+            } catch (error) {
+                this.logger.error(`Error in handover timeout for lead ${leadId}:`, error);
+            } finally {
+                // Limpiar el timeout del mapa
+                this.handoverTimeouts.delete(leadId);
+            }
+        }, 30 * 60 * 1000); // 30 minutos
+
+        // Almacenar el timeout
+        this.handoverTimeouts.set(leadId, timeout);
+
+        this.logger.log(`Handover timeout scheduled for lead ${leadId} in 30 minutes`);
+    }
+
+    private cancelHandoverTimeout(leadId: string) {
+        const timeout = this.handoverTimeouts.get(leadId);
+        if (timeout) {
+            clearTimeout(timeout);
+            this.handoverTimeouts.delete(leadId);
+            this.logger.log(`Handover timeout cancelled for lead ${leadId}`);
+        }
+    }
+
+    // Método público para enviar mensajes desde asesores
+    async sendAdvisorMessage(remoteJid: string, message: string, lead: any) {
+        return this.sendResponse(remoteJid, {
+            text: message,
+            templateKey: 'advisor_message'
+        }, lead);
     }
 }

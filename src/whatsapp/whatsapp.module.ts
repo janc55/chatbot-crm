@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { WhatsappController } from './whatsapp.controller';
 import { BaileysService } from './baileys.service';
@@ -10,7 +10,7 @@ import { SettingsModule } from '../settings/settings.module';
 import { LogsModule } from '../logs/logs.module';
 
 @Module({
-    imports: [LeadsModule, InteractionsModule, TemplatesModule, OpenaiModule, SettingsModule, LogsModule],
+    imports: [forwardRef(() => LeadsModule), InteractionsModule, TemplatesModule, OpenaiModule, SettingsModule, LogsModule],
     providers: [WhatsappService, BaileysService],
     controllers: [WhatsappController],
     exports: [WhatsappService, BaileysService],
