@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from './api';
 
 export default function LeadDetail() {
     const { id } = useParams();
+    const navigate = useNavigate();
     const [lead, setLead] = useState<any>(null);
 
     useEffect(() => {
@@ -21,7 +22,13 @@ export default function LeadDetail() {
                     </h3>
                     <p className="mt-1 max-w-2xl text-sm text-gray-500">{lead.fullName} - {lead.careerInterest}</p>
                 </div>
-                <div className="flex items-center">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate(`/chat/${id}`)}
+                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                        Open Chat
+                    </button>
                     <span className={`mr-2 text-sm font-medium ${lead.isHandoverActive ? 'text-red-600' : 'text-[#064A6F]'}`}>
                         {lead.isHandoverActive ? 'Human Agent Active' : 'Bot Active'}
                     </span>

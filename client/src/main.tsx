@@ -9,6 +9,8 @@ import Templates from './Templates';
 import Settings from './Settings';
 import Logs from './Logs';
 import WhatsAppConnect from './WhatsAppConnect';
+import Chat from './Chat';
+import { ChatProvider } from './context/ChatContext';
 import api from './api';
 import './index.css';
 
@@ -48,18 +50,21 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="leads" element={<Leads />} />
-          <Route path="leads/:id" element={<LeadDetail />} />
-          <Route path="templates" element={<Templates />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="logs" element={<Logs />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <ChatProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="leads" element={<Leads />} />
+            <Route path="leads/:id" element={<LeadDetail />} />
+            <Route path="chat/:leadId" element={<Chat />} />
+            <Route path="templates" element={<Templates />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="logs" element={<Logs />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </ChatProvider>
   );
 }
 

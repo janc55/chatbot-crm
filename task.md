@@ -74,14 +74,14 @@
     - [x] AI confidence threshold for fallback responses
 
 ## Phase 9: CRM Chat & Advisor Tools
-- [ ] Implement Backend Chat Module (Real-time) <!-- id: 37 -->
+- [x] Implement Backend Chat Module (Real-time) <!-- id: 37 -->
     - [x] Create QuickReply model in Prisma
     - [x] Implement ChatGateway (WebSockets)
     - [x] Implement ChatController (History, Send, QuickReplies)
     - [x] Integrate with WhatsappService for sending
 - [ ] Implement Frontend Chat Interface <!-- id: 38 -->
-    - [ ] Add socket.io-client
-    - [ ] Build ChatContext
+    - [x] Add socket.io-client
+    - [x] Build ChatContext
     - [ ] Build Chat Page & Components (MessageList, Input)
 - [ ] Implement Advisor Assistance Features <!-- id: 39 -->
     - [ ] Quick Replies (UI & API)
