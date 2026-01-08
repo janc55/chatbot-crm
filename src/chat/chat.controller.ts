@@ -91,6 +91,12 @@ export class ChatController {
             };
         }
 
+        // Get last 3 messages for context (both user and bot)
+        const recentMessages = history.slice(-6); // Last 6 messages (3 exchanges)
+        const conversationContext = recentMessages
+            .map(m => `${m.direction === 'INBOUND' ? 'Usuario' : 'Bot'}: ${m.content}`)
+            .join('\n');
+
         // Get last user message
         const lastUserMessage = history
             .filter((m) => m.direction === 'INBOUND')
@@ -105,14 +111,15 @@ export class ChatController {
             };
         }
 
-        // Use OpenAI to generate suggestions
-        const prompt = `Eres un asesor universitario. El estudiante preguntó: "${lastUserMessage.content}". 
-Genera 3 respuestas cortas y útiles (máximo 100 caracteres cada una) que un asesor podría usar.
-Contexto: ${lead.careerInterest ? `Interesado en ${lead.careerInterest}` : 'Sin carrera específica'}.
-Responde SOLO con un array JSON de strings, sin explicaciones adicionales.`;
+        // Use OpenAI to generate suggestions with conversation context
+        const careerContext = lead.careerInterest ? `El estudiante está interesado en ${lead.careerInterest}.` : 'No hay carrera específica de interés.';
 
         try {
-            const response = await this.openaiService.generateSuggestions(prompt);
+            const response = await this.openaiService.generateSuggestions(
+                conversationContext,
+                lastUserMessage.content,
+                careerContext
+            );
             return { suggestions: response };
         } catch (error) {
             // Fallback suggestions

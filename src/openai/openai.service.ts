@@ -81,35 +81,84 @@ export class OpenaiService {
         }
     }
 
-    async generateSuggestions(prompt: string): Promise<string[]> {
+    async generateSuggestions(conversationContext: string, lastUserMessage: string, careerContext: string): Promise<string[]> {
         try {
+            const systemPrompt = `Eres un asistente que ayuda a asesores universitarios a responder consultas de estudiantes.
+Genera exactamente 3 sugerencias de respuestas cortas, profesionales y útiles.
+Cada sugerencia debe ser una oración completa de máximo 80 caracteres.
+Las respuestas deben ser naturales, amigables y específicas al contexto.
+Debes responder en formato JSON con una clave "sugerencias" que contenga un array de 3 strings.`;
+
+            const userPrompt = `Contexto de la conversación reciente:
+${conversationContext}
+
+${careerContext}
+
+Último mensaje del estudiante: "${lastUserMessage}"
+
+Genera 3 sugerencias de respuestas específicas y útiles que un asesor podría usar para responder esta pregunta.
+Las sugerencias deben ser directas y responder al tema específico que pregunta el estudiante.
+Responde en formato JSON con la estructura: {"sugerencias": ["respuesta1", "respuesta2", "respuesta3"]}`;
+
             const completion = await this.openai.chat.completions.create({
                 messages: [
-                    { role: 'system', content: 'Eres un asistente que genera sugerencias de respuestas para asesores universitarios.' },
-                    { role: 'user', content: prompt },
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt },
                 ],
                 model: 'gpt-3.5-turbo-0125',
+                response_format: { type: 'json_object' },
                 temperature: 0.7,
             });
 
             const content = completion.choices[0].message.content;
-            // Try to parse as JSON array
-            try {
-                const parsed = JSON.parse(content);
-                if (Array.isArray(parsed)) {
-                    return parsed.slice(0, 3); // Max 3 suggestions
+
+            // Parse JSON response
+            const parsed = JSON.parse(content);
+
+            // Extract suggestions from various possible formats
+            let suggestions: string[] = [];
+
+            if (Array.isArray(parsed)) {
+                suggestions = parsed;
+            } else if (parsed.sugerencias && Array.isArray(parsed.sugerencias)) {
+                suggestions = parsed.sugerencias;
+            } else if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
+                suggestions = parsed.suggestions;
+            } else if (parsed.respuestas && Array.isArray(parsed.respuestas)) {
+                suggestions = parsed.respuestas;
+            } else {
+                // Try to extract any array from the object
+                const values = Object.values(parsed);
+                const arrayValue = values.find(v => Array.isArray(v));
+                if (arrayValue) {
+                    suggestions = arrayValue as string[];
                 }
-            } catch {
-                // If not JSON, split by newlines
-                return content
-                    .split('\n')
-                    .filter(line => line.trim().length > 0)
-                    .slice(0, 3);
             }
-            return [content];
+
+            // Clean and validate suggestions
+            suggestions = suggestions
+                .filter(s => typeof s === 'string' && s.trim().length > 0)
+                .map(s => s.trim())
+                .slice(0, 3);
+
+            // If we got valid suggestions, return them
+            if (suggestions.length > 0) {
+                return suggestions;
+            }
+
+            // Fallback if parsing failed
+            return [
+                'Claro, déjame ayudarte con eso.',
+                '¿Necesitas más información?',
+                'Estoy aquí para resolver tus dudas.',
+            ];
         } catch (error) {
             this.logger.error('Error generating suggestions with OpenAI', error);
-            return [];
+            return [
+                'Claro, déjame ayudarte con eso.',
+                '¿Necesitas más información?',
+                'Estoy aquí para resolver tus dudas.',
+            ];
         }
     }
 }
