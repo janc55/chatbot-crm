@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ChatService } from './chat.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
@@ -28,21 +28,31 @@ export class ChatController {
     async sendMessage(@Body() body: { leadId: string; message: string }) {
         const { leadId, message } = body;
 
+        console.log('Backend: Sending message to lead:', leadId, 'message:', message);
+
         // Get lead info
         const lead = await this.leadsService.findById(leadId);
         if (!lead) {
+            console.log('Backend: Lead not found');
             throw new Error('Lead not found');
         }
+
+        console.log('Backend: Lead found:', lead.phone);
 
         // Build remoteJid
         const remoteJid = lead.phone.includes('@') ? lead.phone : `${lead.phone}@s.whatsapp.net`;
 
+        console.log('Backend: RemoteJid:', remoteJid);
+
         // Send via WhatsApp
         await this.whatsappService.sendAdvisorMessage(remoteJid, message, lead);
+
+        console.log('Backend: Message sent via WhatsApp');
 
         // Cancel handover timeout if active
         if (lead.isHandoverActive) {
             await this.leadsService.toggleHandover(leadId, false);
+            console.log('Backend: Handover cancelled');
         }
 
         // Emit to WebSocket clients
@@ -52,6 +62,8 @@ export class ChatController {
             createdAt: new Date(),
             messageType: 'TEXT',
         });
+
+        console.log('Backend: Message emitted to WebSocket');
 
         return { success: true };
     }
@@ -66,6 +78,15 @@ export class ChatController {
     @ApiOperation({ summary: 'Create a new quick reply' })
     async createQuickReply(@Body() body: { title: string; content: string; category?: string }) {
         return this.chatService.createQuickReply(body);
+    }
+
+    @Put('quick-replies/:id')
+    @ApiOperation({ summary: 'Update a quick reply' })
+    async updateQuickReply(
+        @Param('id') id: string,
+        @Body() body: { title: string; content: string; category?: string }
+    ) {
+        return this.chatService.updateQuickReply(id, body);
     }
 
     @Delete('quick-replies/:id')

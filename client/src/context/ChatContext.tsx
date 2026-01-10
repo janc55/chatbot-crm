@@ -40,7 +40,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
 
         socketInstance.on('receive_message', (message: Message) => {
-            console.log('Received message:', message);
+            console.log('Received message via WebSocket:', message);
             setMessages((prev) => [...prev, message]);
         });
 
@@ -70,6 +70,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const sendMessage = async (message: string) => {
         if (!currentLeadId) return;
 
+        console.log('sendMessage called with message:', message, 'leadId:', currentLeadId);
         try {
             const response = await fetch('http://localhost:3000/chat/send', {
                 method: 'POST',
@@ -82,9 +83,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }),
             });
 
+            console.log('Fetch response status:', response.status);
             if (!response.ok) {
                 throw new Error('Failed to send message');
             }
+            console.log('Message sent to backend');
         } catch (error) {
             console.error('Error sending message:', error);
             throw error;

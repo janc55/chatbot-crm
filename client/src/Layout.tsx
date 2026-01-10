@@ -76,6 +76,16 @@ export default function Layout() {
                                     Templates
                                 </Link>
                                 <Link 
+                                    to="/quick-replies" 
+                                    className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${
+                                        isActive('/quick-replies') 
+                                            ? 'bg-[#A7CF3B] text-[#064A6F]' 
+                                            : 'text-white hover:bg-[#0a5a87]'
+                                    }`}
+                                >
+                                    Respuestas Rápidas
+                                </Link>
+                                <Link 
                                     to="/settings" 
                                     className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${
                                         isActive('/settings') 

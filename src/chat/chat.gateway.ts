@@ -43,6 +43,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Method to emit new messages to all clients in a room
     emitMessageToRoom(leadId: string, message: any) {
+        console.log('Gateway: Emitting message to room lead_' + leadId, message);
         this.server.to(`lead_${leadId}`).emit('receive_message', message);
         this.logger.log(`Message emitted to room lead_${leadId}`);
     }

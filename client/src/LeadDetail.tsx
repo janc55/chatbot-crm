@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useChat } from './context/ChatContext';
 import api from './api';
 import axios from 'axios';
+import { toCommandSlug } from './utils/normalizeTitle';
 
 interface QuickReply {
     id: string;
@@ -22,6 +23,7 @@ export default function LeadDetail() {
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [quickReplySuggestions, setQuickReplySuggestions] = useState<QuickReply[]>([]);
 
     useEffect(() => {
         if (!id) return;
@@ -69,15 +71,15 @@ export default function LeadDetail() {
     };
 
     const handleSend = async () => {
+        console.log('handleSend called with input:', input, 'handover:', lead.isHandoverActive);
         if (!input.trim() || !id) return;
 
         setLoading(true);
         try {
+            console.log('Calling sendMessage...');
             await sendMessage(input);
+            console.log('Message sent successfully');
             setInput('');
-            // Refresh lead data to get updated interactions
-            const res = await api.get(`/leads/${id}`);
-            setLead(res.data);
         } catch (error) {
             console.error('Error sending message:', error);
             alert('Error al enviar mensaje');
@@ -94,6 +96,19 @@ export default function LeadDetail() {
     const handleSuggestion = (suggestion: string) => {
         setInput(suggestion);
         setSuggestions([]);
+    };
+
+    const getQuickReplySuggestions = (query: string): QuickReply[] => {
+    if (!query.trim()) return [];
+
+    const normalizedQuery = toCommandSlug(query);  // ← Usamos tu función existente
+
+    return quickReplies
+        .filter(qr => {
+        const normalizedTitle = toCommandSlug(qr.title); // ← y aquí también
+        return normalizedTitle.startsWith(normalizedQuery);
+        })
+        .slice(0, 6); // límite razonable
     };
 
     if (!lead) return <div>Cargando...</div>;
@@ -135,6 +150,16 @@ export default function LeadDetail() {
                             <div className="text-xs text-gray-400 mt-1 flex justify-between">
                                 <span>{new Date(interaction.createdAt).toLocaleTimeString()}</span>
                                 {interaction.templateKey && <span className="ml-2 font-mono text-[10px]">{interaction.templateKey}</span>}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+                {realtimeMessages.map((msg, idx) => (
+                    <div key={`realtime-${idx}`} className={`flex ${msg.direction === 'INBOUND' ? 'justify-start' : 'justify-end'}`}>
+                        <div className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-2 rounded-lg ${msg.direction === 'INBOUND' ? 'bg-white border border-gray-200' : 'bg-[#A7CF3B] bg-opacity-20 border border-[#A7CF3B]'}`}>
+                            <div className="text-sm text-gray-900">{msg.content}</div>
+                            <div className="text-xs text-gray-400 mt-1 flex justify-between">
+                                <span>{new Date(msg.createdAt).toLocaleTimeString()}</span>
                             </div>
                         </div>
                     </div>
@@ -200,20 +225,66 @@ export default function LeadDetail() {
                 )}
 
                 <div className="flex gap-2">
-                    <textarea
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => {
+                    <div className="relative flex-1">
+                        <textarea
+                            value={input}
+                            onChange={(e) => {
+                            const newValue = e.target.value;
+                            setInput(newValue);
+
+                            // Solo procesamos si hay un / en el texto
+                            if (newValue.includes('/')) {
+                                // Tomamos lo que está después del ÚLTIMO /
+                                const parts = newValue.split('/');
+                                const currentQuery = parts[parts.length - 1].trim();
+
+                                if (currentQuery) {
+                                const matches = getQuickReplySuggestions(currentQuery);
+                                setQuickReplySuggestions(matches);
+                                } else {
+                                setQuickReplySuggestions([]);
+                                }
+                            } else {
+                                setQuickReplySuggestions([]);
+                            }
+                            }}
+                            onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey && lead.isHandoverActive) {
                                 e.preventDefault();
                                 handleSend();
                             }
-                        }}
-                        placeholder={lead.isHandoverActive ? "Escribe tu mensaje..." : "Activa el modo Asesor para enviar mensajes"}
-                        disabled={!lead.isHandoverActive}
-                        className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        rows={2}
-                    />
+                            }}
+                            placeholder={lead.isHandoverActive ? "Escribe tu mensaje... (usa / para respuestas rápidas)" : "Activa el modo Asesor para enviar mensajes"}
+                            disabled={!lead.isHandoverActive}
+                            className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            rows={2}
+                        />
+
+                        {/* Dropdown de sugerencias */}
+                        {quickReplySuggestions.length > 0 && lead.isHandoverActive && (
+                            <div className="absolute bottom-full left-0 w-full mb-2 bg-white border border-gray-300 rounded-lg shadow-xl max-h-64 overflow-y-auto z-10">
+                            {quickReplySuggestions.map((qr) => (
+                                <button
+                                key={qr.id}
+                                className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b last:border-b-0 transition-colors"
+                                onClick={() => {
+                                    // Reemplazamos desde el último / con el contenido completo
+                                    const parts = input.split('/');
+                                    parts[parts.length - 1] = ''; // borramos la query parcial
+                                    const newInput = parts.join('/') + qr.content;
+                                    setInput(newInput.trim());
+                                    setQuickReplySuggestions([]); // cerramos sugerencias
+                                }}
+                                >
+                                <div className="font-medium text-[#064A6F]">/{qr.title}</div>
+                                <div className="text-xs text-gray-600 truncate">
+                                    {qr.content.substring(0, 60)}...
+                                </div>
+                                </button>
+                            ))}
+                            </div>
+                        )}
+                        </div>
                     <button
                         onClick={handleSend}
                         disabled={loading || !input.trim() || !lead.isHandoverActive}

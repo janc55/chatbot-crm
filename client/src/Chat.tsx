@@ -29,6 +29,7 @@ const Chat: React.FC = () => {
     const [showQuickReplies, setShowQuickReplies] = useState(false);
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+    const [quickReplySuggestions, setQuickReplySuggestions] = useState<QuickReply[]>([]);
 
     useEffect(() => {
         if (!leadId) return;
@@ -114,6 +115,27 @@ const Chat: React.FC = () => {
     const handleSuggestion = (suggestion: string) => {
         setInput(suggestion);
         setSuggestions([]);
+    };
+
+    const normalizeForSearch = (text: string) => {
+        return text
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9-]/g, "");
+    };
+
+    const getQuickReplySuggestions = (query: string) => {
+        if (!query) return [];
+
+        const normalizedQuery = normalizeForSearch(query);
+
+        return quickReplies
+        .filter(qr => {
+            const normalizedTitle = normalizeForSearch(qr.title);
+            return normalizedTitle.startsWith(normalizedQuery);
+        })
+        .slice(0, 8);
     };
 
     return (
@@ -207,19 +229,69 @@ const Chat: React.FC = () => {
                     )}
 
                     <div className="flex gap-2">
-                        <textarea
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault();
-                                    handleSend();
-                                }
-                            }}
-                            placeholder="Type your message..."
-                            className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            rows={3}
+                        <div className="relative flex-1">
+                            <textarea
+                        value={input}
+                        onChange={(e) => {
+                            const newValue = e.target.value;
+                            setInput(newValue);
+
+                            // Detectamos si está escribiendo un comando
+                            const lastChar = newValue.slice(-1);
+                            const hasSlash = newValue.includes('/');
+
+                            if (hasSlash) {
+                            // Tomamos lo que está después del último /
+                            const parts = newValue.split('/');
+                            const currentQuery = parts[parts.length - 1];
+
+                            if (currentQuery) {
+                                const matches = getQuickReplySuggestions(currentQuery);
+                                setQuickReplySuggestions(matches);
+                            } else {
+                                setQuickReplySuggestions([]);
+                            }
+                            } else {
+                            setQuickReplySuggestions([]);
+                            }
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSend();
+                            }
+                        }}
+                        placeholder="Type your message... (escribe / para respuestas rápidas)"
+                        className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows={3}
                         />
+                        {quickReplySuggestions.length > 0 && (
+                        <div 
+                            className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto z-10"
+                            style={{ maxWidth: 'calc(100% - 100px)' }} // ajusta según necesites
+                        >
+                            {quickReplySuggestions.map((qr) => (
+                            <button
+                                key={qr.id}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gray-100 border-b last:border-b-0"
+                                onClick={() => {
+                                // Reemplazamos desde el último / con el contenido
+                                const parts = input.split('/');
+                                parts[parts.length - 1] = ''; // borramos lo escrito después del /
+                                const newInput = parts.join('/') + qr.content;
+                                setInput(newInput);
+                                setQuickReplySuggestions([]);
+                                }}
+                            >
+                                <div className="font-medium text-[#064A6F]">/{qr.title}</div>
+                                <div className="text-sm text-gray-600 truncate">
+                                {qr.content.substring(0, 60)}...
+                                </div>
+                            </button>
+                            ))}
+                        </div>
+                        )}
+                        </div>
                         <button
                             onClick={handleSend}
                             disabled={loading || !input.trim()}
