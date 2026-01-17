@@ -15,6 +15,8 @@ interface ChatbotSettings {
   aiConfidenceThreshold: number;
   messageGroupingEnabled: boolean;
   messageGroupingTimeout: number;
+  followUpEnabled: boolean;
+  followUpHours: number;
 }
 
 export default function Settings() {
@@ -276,6 +278,46 @@ export default function Settings() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#A7CF3B]"
                   />
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Automatic Follow-up */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Seguimiento Automático (Follow-up)</h2>
+          <p className="text-gray-600 mb-4">Envía un mensaje automático a prospectos interesados que no han respondido recientemente</p>
+
+          <div className="space-y-4">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="followUpEnabled"
+                checked={settings.followUpEnabled}
+                onChange={(e) => updateSetting('followUpEnabled', e.target.checked)}
+                className="h-4 w-4 text-[#A7CF3B] focus:ring-[#A7CF3B] border-gray-300 rounded"
+              />
+              <label htmlFor="followUpEnabled" className="ml-2 text-sm font-medium text-gray-700">
+                Habilitar seguimiento automático
+              </label>
+            </div>
+
+            {settings.followUpEnabled && (
+              <div className="ml-6 max-w-xs">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Horas de inactividad
+                </label>
+                <input
+                  type="number"
+                  value={settings.followUpHours}
+                  onChange={(e) => updateSetting('followUpHours', parseInt(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#A7CF3B]"
+                  min="1"
+                  max="168"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Tiempo que el bot espera sin actividad antes de enviar el seguimiento
+                </p>
               </div>
             )}
           </div>

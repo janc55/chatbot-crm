@@ -14,6 +14,8 @@ export interface ChatbotSettings {
   aiConfidenceThreshold: number; // 0-1
   messageGroupingEnabled: boolean;
   messageGroupingTimeout: number; // in milliseconds
+  followUpEnabled: boolean;
+  followUpHours: number;
 }
 
 @Injectable()
@@ -71,6 +73,8 @@ export class SettingsService implements OnModuleInit {
         aiConfidenceThreshold: parseFloat(settings['aiConfidenceThreshold'] || '0.7'),
         messageGroupingEnabled: settings['messageGroupingEnabled'] !== 'false', // Default true
         messageGroupingTimeout: parseInt(settings['messageGroupingTimeout'] || '3000'), // Default 3s
+        followUpEnabled: settings['followUpEnabled'] === 'true',
+        followUpHours: parseInt(settings['followUpHours'] || '2'),
       };
     } catch (error) {
       console.error('[SettingsService] Error getting chatbot settings, using defaults:', error);
@@ -88,6 +92,8 @@ export class SettingsService implements OnModuleInit {
         aiConfidenceThreshold: 0.7,
         messageGroupingEnabled: true,
         messageGroupingTimeout: 3000,
+        followUpEnabled: true,
+        followUpHours: 2,
       };
     }
   }
@@ -114,7 +120,9 @@ export class SettingsService implements OnModuleInit {
         { key: 'customGreeting', value: '¡Hola! Soy el asistente de la Universidad. ¿En qué puedo ayudarte?', description: 'Custom greeting message' },
         { key: 'aiConfidenceThreshold', value: '0.7', description: 'AI confidence threshold for responses' },
         { key: 'messageGroupingEnabled', value: 'true', description: 'Enable message grouping for ráfagas' },
-        { key: 'messageGroupingTimeout', value: '3000', description: 'Timeout for grouping messages (ms)' }
+        { key: 'messageGroupingTimeout', value: '3000', description: 'Timeout for grouping messages (ms)' },
+        { key: 'followUpEnabled', value: 'true', description: 'Enable automatic follow-up messages' },
+        { key: 'followUpHours', value: '2', description: 'Hours of inactivity before sending follow-up' }
       ];
 
       for (const setting of defaultSettings) {

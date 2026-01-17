@@ -3,9 +3,10 @@ import { TasksService } from './tasks.service';
 import { LeadsModule } from '../leads/leads.module';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { TemplatesModule } from '../templates/templates.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
-    imports: [LeadsModule, WhatsappModule, TemplatesModule],
+    imports: [LeadsModule, WhatsappModule, TemplatesModule, SettingsModule],
     providers: [TasksService],
 })
 export class TasksModule { }
