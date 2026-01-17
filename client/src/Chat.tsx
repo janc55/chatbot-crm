@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChat } from './context/ChatContext';
 import axios from 'axios';
@@ -31,6 +31,8 @@ const Chat: React.FC = () => {
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
     const [quickReplySuggestions, setQuickReplySuggestions] = useState<QuickReply[]>([]);
 
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
     useEffect(() => {
         if (!leadId) return;
 
@@ -52,7 +54,7 @@ const Chat: React.FC = () => {
         // Append realtime messages to the list
         if (realtimeMessages.length > 0) {
             const newMessages = realtimeMessages.map((msg, idx) => ({
-                id: `realtime-${idx}`,
+                id: `realtime-${idx}-${Date.now()}`,
                 direction: msg.direction,
                 content: msg.content,
                 createdAt: msg.createdAt.toString(),
@@ -99,6 +101,7 @@ const Chat: React.FC = () => {
         try {
             await sendMessage(input);
             setInput('');
+            if (textareaRef.current) textareaRef.current.style.height = 'auto';
         } catch (error) {
             console.error('Error sending message:', error);
             alert('Failed to send message');
@@ -110,32 +113,42 @@ const Chat: React.FC = () => {
     const handleQuickReply = (content: string) => {
         setInput(content);
         setShowQuickReplies(false);
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            setTimeout(() => {
+                if (textareaRef.current) textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+            }, 0);
+        }
     };
 
     const handleSuggestion = (suggestion: string) => {
         setInput(suggestion);
         setSuggestions([]);
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            setTimeout(() => {
+                if (textareaRef.current) textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+            }, 0);
+        }
     };
 
     const normalizeForSearch = (text: string) => {
         return text
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9-]/g, "");
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9-]/g, "");
     };
 
     const getQuickReplySuggestions = (query: string) => {
         if (!query) return [];
-
         const normalizedQuery = normalizeForSearch(query);
-
         return quickReplies
-        .filter(qr => {
-            const normalizedTitle = normalizeForSearch(qr.title);
-            return normalizedTitle.startsWith(normalizedQuery);
-        })
-        .slice(0, 8);
+            .filter(qr => {
+                const normalizedTitle = normalizeForSearch(qr.title);
+                return normalizedTitle.indexOf(normalizedQuery) !== -1;
+            })
+            .slice(0, 8);
     };
 
     return (
@@ -163,8 +176,8 @@ const Chat: React.FC = () => {
                             >
                                 <div
                                     className={`max-w-xs px-4 py-2 rounded-lg ${msg.direction === 'OUTBOUND'
-                                            ? 'bg-blue-500 text-white'
-                                            : 'bg-gray-200 text-gray-800'
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-gray-200 text-gray-800'
                                         }`}
                                 >
                                     <p>{msg.content}</p>
@@ -228,76 +241,71 @@ const Chat: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-end">
                         <div className="relative flex-1">
-                            <textarea
-                        value={input}
-                        onChange={(e) => {
-                            const newValue = e.target.value;
-                            setInput(newValue);
-
-                            // Detectamos si está escribiendo un comando
-                            const lastChar = newValue.slice(-1);
-                            const hasSlash = newValue.includes('/');
-
-                            if (hasSlash) {
-                            // Tomamos lo que está después del último /
-                            const parts = newValue.split('/');
-                            const currentQuery = parts[parts.length - 1];
-
-                            if (currentQuery) {
-                                const matches = getQuickReplySuggestions(currentQuery);
-                                setQuickReplySuggestions(matches);
-                            } else {
-                                setQuickReplySuggestions([]);
-                            }
-                            } else {
-                            setQuickReplySuggestions([]);
-                            }
-                        }}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSend();
-                            }
-                        }}
-                        placeholder="Type your message... (escribe / para respuestas rápidas)"
-                        className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        rows={3}
-                        />
-                        {quickReplySuggestions.length > 0 && (
-                        <div 
-                            className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto z-10"
-                            style={{ maxWidth: 'calc(100% - 100px)' }} // ajusta según necesites
-                        >
-                            {quickReplySuggestions.map((qr) => (
-                            <button
-                                key={qr.id}
-                                className="w-full text-left px-4 py-2.5 hover:bg-gray-100 border-b last:border-b-0"
-                                onClick={() => {
-                                // Reemplazamos desde el último / con el contenido
-                                const parts = input.split('/');
-                                parts[parts.length - 1] = ''; // borramos lo escrito después del /
-                                const newInput = parts.join('/') + qr.content;
-                                setInput(newInput);
-                                setQuickReplySuggestions([]);
-                                }}
-                            >
-                                <div className="font-medium text-[#064A6F]">/{qr.title}</div>
-                                <div className="text-sm text-gray-600 truncate">
-                                {qr.content.substring(0, 60)}...
+                            {quickReplySuggestions.length > 0 && (
+                                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto z-10">
+                                    {quickReplySuggestions.map((qr) => (
+                                        <button
+                                            key={qr.id}
+                                            className="w-full text-left px-4 py-2.5 hover:bg-gray-100 border-b last:border-b-0"
+                                            onClick={() => {
+                                                const parts = input.split('/');
+                                                parts[parts.length - 1] = qr.content;
+                                                const newInput = parts.join('');
+                                                setInput(newInput);
+                                                setQuickReplySuggestions([]);
+                                                if (textareaRef.current) {
+                                                    textareaRef.current.style.height = 'auto';
+                                                    setTimeout(() => {
+                                                        if (textareaRef.current) textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+                                                    }, 0);
+                                                }
+                                            }}
+                                        >
+                                            <div className="font-medium text-[#064A6F]">/{qr.title}</div>
+                                            <div className="text-sm text-gray-600 truncate">{qr.content.substring(0, 60)}...</div>
+                                        </button>
+                                    ))}
                                 </div>
-                            </button>
-                            ))}
-                        </div>
-                        )}
+                            )}
+                            <textarea
+                                ref={textareaRef}
+                                value={input}
+                                onChange={(e) => {
+                                    const newValue = e.target.value;
+                                    setInput(newValue);
+
+                                    if (textareaRef.current) {
+                                        textareaRef.current.style.height = 'auto';
+                                        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+                                    }
+
+                                    const parts = newValue.split('/');
+                                    if (parts.length > 1) {
+                                        const query = parts[parts.length - 1];
+                                        setQuickReplySuggestions(getQuickReplySuggestions(query));
+                                    } else {
+                                        setQuickReplySuggestions([]);
+                                    }
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSend();
+                                    }
+                                }}
+                                placeholder="Escribe un mensaje... (usa / para respuestas rápidas)"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none min-h-[42px] max-h-40"
+                                rows={1}
+                            />
                         </div>
                         <button
                             onClick={handleSend}
                             disabled={loading || !input.trim()}
-                            className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 h-[42px]"
                         >
-                            {loading ? 'Sending...' : 'Send'}
+                            {loading ? '...' : 'Enviar'}
                         </button>
                     </div>
                 </div>

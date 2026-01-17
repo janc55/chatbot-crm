@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './Layout';
 import Dashboard from './Dashboard';
 import Leads from './Leads';
@@ -10,17 +10,26 @@ import Settings from './Settings';
 import Logs from './Logs';
 import WhatsAppConnect from './WhatsAppConnect';
 import QuickReplies from './QuickReplies';
+import Login from './Login';
 import { ChatProvider } from './context/ChatContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { ProtectedRoute, AdminRoute } from './utils/ProtectedRoute';
+import { Toaster } from 'react-hot-toast';
 import api from './api';
 import './index.css';
 
-function App() {
+function AppContent() {
+  const { user, loading: authLoading } = useAuth();
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkConnection();
-  }, []);
+    if (user) {
+      checkConnection();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
   const checkConnection = async () => {
     try {
@@ -34,37 +43,64 @@ function App() {
     }
   };
 
-  if (loading) {
+  if (authLoading || (user && loading)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#064A6F] mx-auto mb-4"></div>
-          <p className="text-[#064A6F] font-medium">Verificando conexión...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A7CF3B] mx-auto mb-4"></div>
+          <p className="text-[#A7CF3B] font-medium">Cargando...</p>
         </div>
       </div>
     );
   }
 
-  if (!isConnected) {
+  // If logged in but not connected, show connection page
+  // Except for admin routes or specific cases if needed
+  if (user && isConnected === false) {
     return <WhatsAppConnect onConnected={() => setIsConnected(true)} />;
   }
 
   return (
-    <ChatProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="leads" element={<Leads />} />
-            <Route path="leads/:id" element={<LeadDetail />} />
-            <Route path="quick-replies" element={<QuickReplies />} />
-            <Route path="templates" element={<Templates />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="logs" element={<Logs />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </ChatProvider>
+    <Routes>
+      <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Layout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<Dashboard />} />
+        <Route path="leads" element={<Leads />} />
+        <Route path="leads/:id" element={<LeadDetail />} />
+        <Route path="quick-replies" element={<QuickReplies />} />
+        <Route path="templates" element={<Templates />} />
+        <Route path="settings" element={
+          <AdminRoute>
+            <Settings />
+          </AdminRoute>
+        } />
+        <Route path="logs" element={
+          <AdminRoute>
+            <Logs />
+          </AdminRoute>
+        } />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <ChatProvider>
+        <BrowserRouter>
+          <Toaster position="top-right" />
+          <AppContent />
+        </BrowserRouter>
+      </ChatProvider>
+    </AuthProvider>
   );
 }
 

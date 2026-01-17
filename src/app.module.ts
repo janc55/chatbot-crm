@@ -11,6 +11,8 @@ import { TasksModule } from './tasks/tasks.module';
 import { SettingsModule } from './settings/settings.module';
 import { LogsModule } from './logs/logs.module';
 import { ChatModule } from './chat/chat.module';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
     imports: [
@@ -28,6 +30,8 @@ import { ChatModule } from './chat/chat.module';
         SettingsModule,
         LogsModule,
         ChatModule,
+        AuthModule,
+        UsersModule,
     ],
     controllers: [],
     providers: [],
