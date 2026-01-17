@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { BellIcon, UserIcon } from '@heroicons/react/24/outline';
+import { BellIcon, UserIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from './context/AuthContext';
 import api from './api';
@@ -176,6 +176,16 @@ export default function Layout() {
                                                 }`}
                                         >
                                             Logs
+                                        </Link>
+                                        <Link
+                                            to="/users"
+                                            className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${isActive('/users')
+                                                ? 'bg-[#A7CF3B] text-[#064A6F]'
+                                                : 'text-white hover:bg-[#0a5a87]'
+                                                }`}
+                                        >
+                                            <UsersIcon className="h-5 w-5 mr-1" />
+                                            Usuarios
                                         </Link>
                                     </>
                                 )}

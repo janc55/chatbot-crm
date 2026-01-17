@@ -11,6 +11,7 @@ import Logs from './Logs';
 import WhatsAppConnect from './WhatsAppConnect';
 import QuickReplies from './QuickReplies';
 import Login from './Login';
+import Users from './Users';
 import { ChatProvider } from './context/ChatContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute, AdminRoute } from './utils/ProtectedRoute';
@@ -82,6 +83,11 @@ function AppContent() {
         <Route path="logs" element={
           <AdminRoute>
             <Logs />
+          </AdminRoute>
+        } />
+        <Route path="users" element={
+          <AdminRoute>
+            <Users />
           </AdminRoute>
         } />
       </Route>

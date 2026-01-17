@@ -68,15 +68,17 @@ model Setting {
 }
 
 model Tenant {
-  id        String   @id @default(uuid())
-  name      String
-  domain    String?  @unique
-  createdAt DateTime @default(now()) @map("created_at")
-  users     User[]
-  leads     Lead[]
-  templates Template[]
-  settings  Setting[]
-  quickReplies QuickReply[]
+  id               String   @id @default(uuid())
+  name             String
+  domain           String?  @unique
+  maxUsers         Int      @default(5) @map("max_users")
+  subscriptionPlan String   @default("FREE") @map("subscription_plan")
+  createdAt        DateTime @default(now()) @map("created_at")
+  users            User[]
+  leads            Lead[]
+  templates        Template[]
+  settings         Setting[]
+  quickReplies     QuickReply[]
 
   @@map("tenants")
 }
