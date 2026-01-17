@@ -12,11 +12,13 @@ export interface ChatbotSettings {
   workingHoursEnd: string; // HH:MM format
   customGreeting: string;
   aiConfidenceThreshold: number; // 0-1
+  messageGroupingEnabled: boolean;
+  messageGroupingTimeout: number; // in milliseconds
 }
 
 @Injectable()
 export class SettingsService implements OnModuleInit {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async onModuleInit() {
     try {
@@ -66,7 +68,9 @@ export class SettingsService implements OnModuleInit {
         workingHoursStart: settings['workingHoursStart'] || '08:00',
         workingHoursEnd: settings['workingHoursEnd'] || '18:00',
         customGreeting: settings['customGreeting'] || '¡Hola! Soy el asistente de la Universidad. ¿En qué puedo ayudarte?',
-        aiConfidenceThreshold: parseFloat(settings['aiConfidenceThreshold'] || '0.7')
+        aiConfidenceThreshold: parseFloat(settings['aiConfidenceThreshold'] || '0.7'),
+        messageGroupingEnabled: settings['messageGroupingEnabled'] !== 'false', // Default true
+        messageGroupingTimeout: parseInt(settings['messageGroupingTimeout'] || '3000'), // Default 3s
       };
     } catch (error) {
       console.error('[SettingsService] Error getting chatbot settings, using defaults:', error);
@@ -81,7 +85,9 @@ export class SettingsService implements OnModuleInit {
         workingHoursStart: '08:00',
         workingHoursEnd: '18:00',
         customGreeting: '¡Hola! Soy el asistente de la Universidad. ¿En qué puedo ayudarte?',
-        aiConfidenceThreshold: 0.7
+        aiConfidenceThreshold: 0.7,
+        messageGroupingEnabled: true,
+        messageGroupingTimeout: 3000,
       };
     }
   }
@@ -96,13 +102,6 @@ export class SettingsService implements OnModuleInit {
 
   async initializeDefaultSettings(): Promise<void> {
     try {
-      // Check if settings already exist
-      const existingSettings = await this.prisma.setting.count();
-      if (existingSettings > 0) {
-        console.log('[SettingsService] Settings already exist, skipping initialization');
-        return;
-      }
-
       const defaultSettings: Array<{ key: string; value: string; description: string }> = [
         { key: 'messageDelayEnabled', value: 'true', description: 'Enable message delays to simulate typing' },
         { key: 'messageDelayMin', value: '800', description: 'Minimum delay before sending message (ms)' },
@@ -113,14 +112,24 @@ export class SettingsService implements OnModuleInit {
         { key: 'workingHoursStart', value: '08:00', description: 'Working hours start time' },
         { key: 'workingHoursEnd', value: '18:00', description: 'Working hours end time' },
         { key: 'customGreeting', value: '¡Hola! Soy el asistente de la Universidad. ¿En qué puedo ayudarte?', description: 'Custom greeting message' },
-        { key: 'aiConfidenceThreshold', value: '0.7', description: 'AI confidence threshold for responses' }
+        { key: 'aiConfidenceThreshold', value: '0.7', description: 'AI confidence threshold for responses' },
+        { key: 'messageGroupingEnabled', value: 'true', description: 'Enable message grouping for ráfagas' },
+        { key: 'messageGroupingTimeout', value: '3000', description: 'Timeout for grouping messages (ms)' }
       ];
 
       for (const setting of defaultSettings) {
-        await this.setSetting(setting.key, setting.value, setting.description, 'chatbot');
+        // Check if individual setting exists
+        const existing = await this.prisma.setting.findUnique({
+          where: { key: setting.key }
+        });
+
+        if (!existing) {
+          await this.setSetting(setting.key, setting.value, setting.description, 'chatbot');
+          console.log(`[SettingsService] Initialized new setting: ${setting.key}`);
+        }
       }
 
-      console.log('[SettingsService] Default settings initialized successfully');
+      console.log('[SettingsService] Default settings check completed');
     } catch (error) {
       console.error('[SettingsService] Error in initializeDefaultSettings:', error);
       throw error;

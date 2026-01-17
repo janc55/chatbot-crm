@@ -13,6 +13,8 @@ interface ChatbotSettings {
   workingHoursEnd: string;
   customGreeting: string;
   aiConfidenceThreshold: number;
+  messageGroupingEnabled: boolean;
+  messageGroupingTimeout: number;
 }
 
 export default function Settings() {
@@ -165,6 +167,47 @@ export default function Settings() {
                   />
                   <p className="text-xs text-gray-500 mt-1">Bonus de delay por longitud (más alto = menos bonus)</p>
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Message Grouping */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Agrupación de Mensajes (Ráfagas)</h2>
+          <p className="text-gray-600 mb-4">Permite que el bot espere unos segundos para consolidar múltiples mensajes enviados consecutivamente por el usuario</p>
+
+          <div className="space-y-4">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="messageGroupingEnabled"
+                checked={settings.messageGroupingEnabled}
+                onChange={(e) => updateSetting('messageGroupingEnabled', e.target.checked)}
+                className="h-4 w-4 text-[#A7CF3B] focus:ring-[#A7CF3B] border-gray-300 rounded"
+              />
+              <label htmlFor="messageGroupingEnabled" className="ml-2 text-sm font-medium text-gray-700">
+                Habilitar agrupación de mensajes
+              </label>
+            </div>
+
+            {settings.messageGroupingEnabled && (
+              <div className="ml-6 max-w-xs">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tiempo de espera (ms)
+                </label>
+                <input
+                  type="number"
+                  value={settings.messageGroupingTimeout}
+                  onChange={(e) => updateSetting('messageGroupingTimeout', parseInt(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#A7CF3B]"
+                  min="500"
+                  max="10000"
+                  step="500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Tiempo que el bot espera tras el último mensaje antes de procesar la ráfaga
+                </p>
               </div>
             )}
           </div>

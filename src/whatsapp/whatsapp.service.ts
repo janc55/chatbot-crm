@@ -6,6 +6,7 @@ import { TemplatesService } from '../templates/templates.service';
 import { OpenaiService } from '../openai/openai.service';
 import { LogsService } from '../logs/logs.service';
 import { ChatGateway } from '../chat/chat.gateway';
+import { SettingsService } from '../settings/settings.service';
 import { LeadStatus, Direction, MessageType } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -16,6 +17,12 @@ export class WhatsappService {
 
     private processedMessages = new Set<string>();
     private handoverTimeouts = new Map<string, NodeJS.Timeout>(); // leadId -> timeout
+    private messageBuffers = new Map<string, {
+        messages: { text: string, messageId: string }[],
+        timeout: NodeJS.Timeout,
+        name: string,
+        phoneNumber: string
+    }>();
 
     constructor(
         @Inject(forwardRef(() => BaileysService))
@@ -27,6 +34,7 @@ export class WhatsappService {
         private logsService: LogsService,
         @Inject(forwardRef(() => ChatGateway))
         private chatGateway: ChatGateway,
+        private settingsService: SettingsService,
     ) {
         this.logger.log('[DEBUG] WhatsappService constructor called');
         this.logger.log('[DEBUG] BaileysService injected:', !!this.baileysService);
@@ -59,176 +67,205 @@ export class WhatsappService {
         // Clean up cache after 15 seconds
         setTimeout(() => this.processedMessages.delete(messageId), 15000);
 
-        this.logger.log(`Processing message from ${remoteJid} (phone: ${phoneNumberFromData}): ${text}`);
+        // Get grouping settings
+        const settings = await this.settingsService.getChatbotSettings();
+
+        if (settings.messageGroupingEnabled) {
+            this.logger.log(`[GROUPING] Adding message to buffer for ${remoteJid}: ${text}`);
+
+            let buffer = this.messageBuffers.get(remoteJid);
+
+            if (buffer) {
+                clearTimeout(buffer.timeout);
+                buffer.messages.push({ text, messageId });
+            } else {
+                buffer = {
+                    messages: [{ text, messageId }],
+                    name: name || 'Usuario',
+                    phoneNumber: phoneNumberFromData || this.extractPhoneFromJid(remoteJid),
+                    timeout: null
+                };
+            }
+
+            buffer.timeout = setTimeout(() => {
+                this.executeBatchProcess(remoteJid);
+            }, settings.messageGroupingTimeout);
+
+            this.messageBuffers.set(remoteJid, buffer);
+            return;
+        }
+
+        // Si no está habilitada la agrupación, procesar individualmente (comportamiento anterior refactorizado)
+        await this.executeProcessing(remoteJid, phoneNumberFromData, [{ text, messageId }], name);
+    }
+
+    private async executeBatchProcess(remoteJid: string) {
+        const buffer = this.messageBuffers.get(remoteJid);
+        if (!buffer) return;
+
+        this.messageBuffers.delete(remoteJid);
+
+        this.logger.log(`[GROUPING] Executing batch process for ${remoteJid} with ${buffer.messages.length} messages`);
+        await this.executeProcessing(remoteJid, buffer.phoneNumber, buffer.messages, buffer.name);
+    }
+
+    private async executeProcessing(remoteJid: string, phoneNumberFromData: string, messages: { text: string, messageId: string }[], name: string) {
+        // Normalizar texto: unir sin espacios excesivos y convertir ráfagas fragmentadas
+        // "re ", "qui ", "sitos" -> "re qui sitos"
+        const combinedText = messages.map(m => m.text).join(' ').replace(/\s+/g, ' ').trim();
+
+        if (!combinedText) return;
+
+        this.logger.log(`Processing message(s) from ${remoteJid} (phone: ${phoneNumberFromData}): ${combinedText}`);
 
         // 1. Find or Create Lead
-        // Validar que tenemos un número de teléfono válido
         let phoneToSave = phoneNumberFromData;
 
         if (!phoneToSave) {
-            this.logger.error(`CRITICAL: No phone number provided for remoteJid: ${remoteJid}`);
-            this.logsService.addLog('error', `No phone number provided for message from ${remoteJid}`, 'WhatsappService');
-            // Intentar extraer del remoteJid como último recurso
             phoneToSave = this.extractPhoneFromJid(remoteJid);
             if (!phoneToSave || phoneToSave.length < 8) {
                 this.logger.error(`CRITICAL: Cannot extract valid phone number from ${remoteJid}`);
-                this.logsService.addLog('error', `Cannot extract valid phone number from ${remoteJid}`, 'WhatsappService');
-                return; // No procesar si no tenemos un número válido
+                return;
             }
         }
 
-        // Validar que el número es válido (solo dígitos, mínimo 8 caracteres)
         if (!/^\d{8,}$/.test(phoneToSave)) {
-            this.logger.error(`CRITICAL: Invalid phone number format: ${phoneToSave} from remoteJid: ${remoteJid}`);
-            return; // No procesar si el número no es válido
+            this.logger.error(`CRITICAL: Invalid phone number format: ${phoneToSave}`);
+            return;
         }
 
-        this.logger.log(`Using validated phone number for lead: ${phoneToSave}`);
         const lead = await this.leadsService.findOrCreate(phoneToSave, name);
 
-        // 2. Log Inbound Interaction
+        // 2. Log Inbound Interaction (log separately for transparency, or combined?)
+        // Log combined interaction for the conversation view
         await this.interactionsService.logInteraction({
             leadId: lead.id,
             direction: Direction.INBOUND,
             messageType: MessageType.TEXT,
-            content: text,
+            content: combinedText,
         });
 
-        // Emit to WebSocket clients
+        // Emit to WebSocket
         this.chatGateway.emitMessageToRoom(lead.id, {
             direction: 'INBOUND',
-            content: text,
+            content: combinedText,
             createdAt: new Date(),
             messageType: 'TEXT',
         });
 
         // CHECK HANDOVER
-        // CHECK HANDOVER
         if (lead.isHandoverActive) {
             this.logsService.addLog('log', `Message received from ${lead.phone} while Handover is ACTIVE. Bot is silent.`, 'WhatsappService');
-            this.logger.log(`[HANDOVER ACTIVE] Message from ${remoteJid} ignored by bot. Waiting for advisor.`);
-            // STOP PROCESSING - Do NOT auto-cancel handover on user message
-            // Handover can only be cancelled by:
-            // 1. Advisor sending a message (sendAdvisorMessage)
-            // 2. Advisor clicking "Stop Handover" (API)
-            // 3. Timeout (30 mins)
             return;
         }
 
         // 3. Determine Response
-        const response = await this.handleIntent(text, lead);
+        const responses = await this.handleIntents(combinedText, lead);
 
-        // 4. Send Response
-        if (response) {
-            await this.sendResponse(remoteJid, response, lead);
-            this.logsService.addLog('log', `Bot response sent to ${remoteJid}: ${response.text?.substring(0, 100)}...`, 'WhatsappService');
+        // 4. Send Responses
+        if (responses && responses.length > 0) {
+            for (const response of responses) {
+                await this.sendResponse(remoteJid, response, lead);
+                this.logsService.addLog('log', `Bot response sent to ${remoteJid}: ${response.text?.substring(0, 100)}...`, 'WhatsappService');
+
+                // Pequeño delay entre respuestas múltiples para que no lleguen instantáneamente si no hay delay configurado
+                if (responses.length > 1) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
         } else {
             this.logsService.addLog('warn', `No response generated for message from ${remoteJid}`, 'WhatsappService');
         }
     }
 
-    private async handleIntent(text: string, lead: any): Promise<{ text: string; templateKey?: string; attachments?: any, statusUpdate?: LeadStatus } | null> {
+    private async handleIntents(text: string, lead: any): Promise<{ text: string; templateKey?: string; attachments?: any, statusUpdate?: LeadStatus }[]> {
         const lowerText = text.toLowerCase();
+        const responses: { text: string; templateKey?: string; attachments?: any, statusUpdate?: LeadStatus }[] = [];
 
-        // --- RULE BASED MATCHING ---
+        // --- RULE BASED MATCHING (Pre-IA) ---
+        // Se pueden acumular múltiples respuestas de reglas si es necesario
 
-        // Greeting / Start
+        // Greeting
         if (lowerText.match(/hola|buen|info|inicio/)) {
             const t = await this.templatesService.findByKey('bienvenida');
-            return t ? { text: t.content, templateKey: t.key, attachments: t.attachments ? JSON.parse(t.attachments) : null } : null;
+            if (t) responses.push({ text: t.content, templateKey: t.key, attachments: t.attachments ? JSON.parse(t.attachments) : null });
         }
 
         // Careers
         if (lowerText.includes('medicina')) {
             await this.leadsService.updateInterest(lead.phone, 'MEDICINA');
             const t = await this.templatesService.findByKey('brochure_medicina');
-            return t ? { text: t.content, templateKey: t.key, attachments: t.attachments ? JSON.parse(t.attachments) : null, statusUpdate: LeadStatus.INTERESADO_BROCHURE } : null;
+            if (t) responses.push({ text: t.content, templateKey: t.key, attachments: t.attachments ? JSON.parse(t.attachments) : null, statusUpdate: LeadStatus.INTERESADO_BROCHURE });
         }
 
         if (lowerText.includes('derecho') || lowerText.includes('abogado') || lowerText.includes('leyes')) {
             await this.leadsService.updateInterest(lead.phone, 'DERECHO');
             const t = await this.templatesService.findByKey('brochure_derecho');
-            return t ? { text: t.content, templateKey: t.key, attachments: t.attachments ? JSON.parse(t.attachments) : null, statusUpdate: LeadStatus.INTERESADO_BROCHURE } : null;
+            if (t) responses.push({ text: t.content, templateKey: t.key, attachments: t.attachments ? JSON.parse(t.attachments) : null, statusUpdate: LeadStatus.INTERESADO_BROCHURE });
         }
 
-        // Costos (Regex simple)
-        if (lowerText.match(/costo|precio|cuanto cuesta|valor/)) {
-            let key = 'costos_generales';
-            if (lead.careerInterest === 'MEDICINA' || lowerText.includes('medicina')) key = 'costos_medicina';
-            if (lead.careerInterest === 'DERECHO' || lowerText.includes('derecho')) key = 'costos_derecho';
+        // Si ya tenemos respuestas de reglas, podríamos saltarnos la IA o complementarla.
+        // En este caso, si ya hay respuestas (ej. saludo + brochure), buscaremos si hay más intents específicos con la IA
+        // pero evitando duplicar lo que ya procesamos manualmente.
 
-            let t = await this.templatesService.findByKey(key);
-            if (!t && key !== 'costos_generales') t = await this.templatesService.findByKey('costos_medicina'); // Fallback demo
-            return t ? { text: t.content, templateKey: t.key, statusUpdate: LeadStatus.INTERESADO_COSTOS } : null;
-        }
-
-        // --- OPENAI FALLBACK (RAG) ---
-
-        // 1. Contextualize Query using Career Interest
+        // --- OPENAI FALLBACK / COMPLEX MATCHING ---
+        // Contextualize Query
         let searchContext = text;
-        if (lead.careerInterest) {
-            searchContext += ` ${lead.careerInterest}`;
-        }
+        if (lead.careerInterest) searchContext += ` ${lead.careerInterest}`;
 
-        // Retrieve only the most relevant templates (Top 5) based on embedding similarity using contextualized query
         const topTemplates = await this.templatesService.findMostRelevant(searchContext, 5);
+        let context = topTemplates.length > 0
+            ? topTemplates.map(t => `- KEY: ${t.key} (Cat: ${t.category}): ${(t.content || '').substring(0, 150)}...`).join('\n')
+            : await this.templatesService.getContextSummary();
 
-        let context = '';
-        if (topTemplates.length > 0) {
-            context = topTemplates.map(t => `- KEY: ${t.key} (Cat: ${t.category}): ${(t.content || '').substring(0, 150)}...`).join('\n'); // Increased substring length
-        } else {
-            // Fallback to general summary if no matches found
-            context = await this.templatesService.getContextSummary();
-        }
-
-        // 2. Fetch Conversation History
         const lastMessages = await this.leadsService.getLastMessages(lead.id, 6);
-        // Format history: Oldest first
-        const historyText = lastMessages.reverse().map(m =>
-            `${m.direction === 'INBOUND' ? 'Usuario' : 'Bot'}: ${m.content}`
-        ).join('\n');
+        const historyText = lastMessages.reverse().map(m => `${m.direction === 'INBOUND' ? 'Usuario' : 'Bot'}: ${m.content}`).join('\n');
 
         const classification = await this.openaiService.classifyMessage(text, context, historyText);
 
-        if (classification.needs_human || !classification.template_key) {
-            // Activar handover automático
+        if (classification.needs_human) {
             await this.leadsService.toggleHandover(lead.id, true);
             await this.leadsService.updateStatus(lead.phone, LeadStatus.NECESITA_ASESOR);
+            this.logsService.addHandoverAlert(lead.id, lead.phone, lead.fullName, `Asistencia humana: "${text.substring(0, 100)}"`);
 
-            // Generar alerta para el asesor
-            this.logsService.addHandoverAlert(
-                lead.id,
-                lead.phone,
-                lead.fullName,
-                `Lead necesita asistencia humana. Mensaje: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`
-            );
-
-            // Notificar sobre el handover
-            this.logsService.addLog('log', `Handover activated for lead ${lead.phone} (${lead.fullName || 'Unknown'}) - Reason: ${classification.needs_human ? 'AI Flag' : 'No Template Matched'}`, 'WhatsappService');
-
-            // Programar reactivación automática en 30 minutos si no hay respuesta del asesor
             const remoteJidForTimeout = lead.phone.includes('@') ? lead.phone : `${lead.phone}@s.whatsapp.net`;
             this.scheduleHandoverTimeout(lead.id, remoteJidForTimeout);
 
             const t = await this.templatesService.findByKey('necesita_asesor');
-            return t ? { text: t.content, templateKey: t.key } : { text: "Un asesor te contactará.", templateKey: 'fallback' };
+            responses.push(t ? { text: t.content, templateKey: t.key } : { text: "Un asesor te contactará.", templateKey: 'fallback' });
+            return responses;
         }
 
-        if (classification.template_key) {
-            const t = await this.templatesService.findByKey(classification.template_key);
+        // Deduplicar claves devueltas por la IA para evitar respuestas dobles
+        const uniqueTemplateKeys = [...new Set(classification.template_keys)];
+
+        for (const key of uniqueTemplateKeys) {
+            // Evitar duplicados si la regla manual ya lo agregó
+            if (responses.some(r => r.templateKey === key)) continue;
+
+            const t = await this.templatesService.findByKey(key);
             if (t) {
                 let finalText = t.content;
-                if (classification.extra_text) finalText += `\n\n${classification.extra_text}`;
-                return {
+                // Agregar extra_text solo a la última respuesta
+                if (key === classification.template_keys[classification.template_keys.length - 1] && classification.extra_text) {
+                    finalText += `\n\n${classification.extra_text}`;
+                }
+                responses.push({
                     text: finalText,
                     templateKey: t.key,
                     attachments: t.attachments ? JSON.parse(t.attachments) : null
-                };
+                });
             }
         }
 
-        // Should not happen due to the first if, but just in case
-        return null;
+        return responses;
+    }
+
+    private async handleIntent(text: string, lead: any): Promise<{ text: string; templateKey?: string; attachments?: any, statusUpdate?: LeadStatus } | null> {
+        // Este método queda obsoleto pero se mantiene por si hay llamadas internas o para una migración limpia
+        const results = await this.handleIntents(text, lead);
+        return results.length > 0 ? results[0] : null;
+
     }
 
     private async sendResponse(remoteJid: string, response: any, lead: any) {

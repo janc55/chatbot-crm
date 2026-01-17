@@ -251,7 +251,14 @@ export default function LeadDetail() {
                             onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey && lead.isHandoverActive) {
                                 e.preventDefault();
-                                handleSend();
+                                if (quickReplySuggestions.length > 0) {
+                                    // Seleccionar la primera sugerencia
+                                    const firstSuggestion = quickReplySuggestions[0];
+                                    setInput(firstSuggestion.content.trim());
+                                    setQuickReplySuggestions([]);
+                                } else {
+                                    handleSend();
+                                }
                             }
                             }}
                             placeholder={lead.isHandoverActive ? "Escribe tu mensaje... (usa / para respuestas rápidas)" : "Activa el modo Asesor para enviar mensajes"}
@@ -268,11 +275,7 @@ export default function LeadDetail() {
                                 key={qr.id}
                                 className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b last:border-b-0 transition-colors"
                                 onClick={() => {
-                                    // Reemplazamos desde el último / con el contenido completo
-                                    const parts = input.split('/');
-                                    parts[parts.length - 1] = ''; // borramos la query parcial
-                                    const newInput = parts.join('/') + qr.content;
-                                    setInput(newInput.trim());
+                                    setInput(qr.content.trim());
                                     setQuickReplySuggestions([]); // cerramos sugerencias
                                 }}
                                 >

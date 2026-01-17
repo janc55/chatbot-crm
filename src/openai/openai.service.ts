@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 
 export interface ClassificationResult {
-    intent: string;
-    template_key: string | null;
+    intents: string[];
+    template_keys: string[];
     needs_human: boolean;
     extra_text?: string;
 }
@@ -37,8 +37,13 @@ export class OpenaiService {
         try {
             const systemPrompt = `
       Eres un asistente de atención al cliente para una universidad.
-      Tu tarea es CLASIFICAR el mensaje del usuario y seleccionar una plantilla de respuesta SI existe.
-      NO inventes precios, fechas ni requisitos.
+      Tu tarea es ANALIZAR el mensaje del usuario y seleccionar TODAS las plantillas de respuesta pertinentes SI existen.
+      
+      CONSIDERACIONES CRÍTICAS:
+      1. RÁFAGAS Y FRAGMENTACIÓN: El usuario puede enviar ráfagas que se agrupan. A veces las palabras vienen cortadas por espacios (ej: "re qui sitos"). Si detectas palabras fragmentadas que unidas forman un término clave del contexto, interprétalo como tal.
+      2. REDUNDANCIA: Revisa el historial. Si una plantilla ya fue enviada en los últimos 2-3 mensajes y el usuario no ha cambiado de tema (ej: solo envió un "?"), NO la vuelvas a incluir en template_keys a menos que sea estrictamente necesario.
+      3. AMBIGÜEDAD: Si el mensaje consolidado es solo puntuación (ej: "?") o ruidos (ej: "asdf") y no hay un intent claro en el historial reciente, devuelve template_keys vacío.
+      4. NO inventes precios, fechas ni requisitos.
       
       Historial de conversación reciente:
       ${conversationHistory}
@@ -48,14 +53,15 @@ export class OpenaiService {
 
       Debes responder SIEMPRE con un JSON válido con este formato:
       {
-        "intent": "string (ej. COSTOS_MEDICINA, BROCHURE_DERECHO, SALUDO, ETC)",
-        "template_key": "string | null (la clave exacta de la plantilla a usar)",
-        "needs_human": boolean (true si no hay plantilla clara o es una queja/caso complejo),
-        "extra_text": "string (opcional, breve frase para suavizar o enganchar, máximo 1 linea)"
+        "intents": ["string", "string"], (lista de intents identificados ej. SALUDO, COSTOS_MEDICINA)
+        "template_keys": ["string"], (lista con las claves exactas de las plantillas a usar en orden lógico)
+        "needs_human": boolean (true si alguna parte crítica no tiene plantilla clara o es una queja/caso complejo),
+        "extra_text": "string (opcional, breve frase para suavizar o enganchar al final, máximo 1 linea)"
       }
       
-      Si el usuario pide algo que NO está en el contexto, needs_human = true.
+      Si el usuario pide algo que NO está en el contexto y es crítico, needs_human = true.
       Si el usuario pide "requisitos" o "costos" y el historial o contexto implica una carrera específica, busca la plantilla específica (ej. requisitos_gth).
+      Manten la lista de template_keys en un orden de respuesta natural (ej. [bienvenida, brochure_medicina, costos_medicina]).
       `;
 
             const completion = await this.openai.chat.completions.create({
@@ -74,8 +80,8 @@ export class OpenaiService {
             this.logger.error('Error classifying message with OpenAI', error);
             // Fallback
             return {
-                intent: 'UNKNOWN',
-                template_key: null,
+                intents: ['UNKNOWN'],
+                template_keys: [],
                 needs_human: true,
             };
         }
