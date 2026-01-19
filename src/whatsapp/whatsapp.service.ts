@@ -8,6 +8,7 @@ import { LogsService } from '../logs/logs.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { SettingsService } from '../settings/settings.service';
 import { LeadStatus, Direction, MessageType } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -21,7 +22,9 @@ export class WhatsappService {
         messages: { text: string, messageId: string }[],
         timeout: NodeJS.Timeout,
         name: string,
-        phoneNumber: string
+        phoneNumber: string,
+        tenantId: string,
+        instanceId: string
     }>();
 
     constructor(
@@ -35,45 +38,86 @@ export class WhatsappService {
         @Inject(forwardRef(() => ChatGateway))
         private chatGateway: ChatGateway,
         private settingsService: SettingsService,
+        private prisma: PrismaService,
     ) {
         this.logger.log('[DEBUG] WhatsappService constructor called');
-        this.logger.log('[DEBUG] BaileysService injected:', !!this.baileysService);
-        this.logger.log('[DEBUG] LeadsService injected:', !!this.leadsService);
-        this.logger.log('[DEBUG] TemplatesService injected:', !!this.templatesService);
-        this.logger.log('[DEBUG] OpenAIService injected:', !!this.openaiService);
     }
 
+    // --- INSTANCE MANAGEMENT ---
+
+    async createInstance(tenantId: string, name: string) {
+        const sessionId = `${tenantId}_${Date.now()}`;
+        return this.prisma.whatsappInstance.create({
+            data: {
+                tenantId,
+                name,
+                sessionId,
+                status: 'DISCONNECTED'
+            }
+        });
+    }
+
+    async getInstances(tenantId: string) {
+        return this.prisma.whatsappInstance.findMany({
+            where: { tenantId }
+        });
+    }
+
+    async getInstance(id: string) {
+        return this.prisma.whatsappInstance.findUnique({
+            where: { id }
+        });
+    }
+
+    async deleteInstance(id: string) {
+        const instance = await this.getInstance(id);
+        if (instance) {
+            await this.baileysService.logout(id);
+            return this.prisma.whatsappInstance.delete({ where: { id } });
+        }
+    }
+
+    // --- MESSAGE PROCESSING ---
+
     async sendFollowUp(lead: any, template: any) {
-        // Convertir el número de teléfono a JID completo para enviar mensajes
+        if (!lead.tenantId) {
+            this.logger.warn(`Cannot send follow up to lead ${lead.id} without tenantId`);
+            return;
+        }
+
+        const instance = await this.prisma.whatsappInstance.findFirst({
+            where: { tenantId: lead.tenantId, status: 'CONNECTED' }
+        });
+
+        if (!instance) {
+            this.logger.warn(`No connected instance found for tenant ${lead.tenantId}`);
+            return;
+        }
+
         const remoteJid = lead.phone.includes('@') ? lead.phone : `${lead.phone}@s.whatsapp.net`;
         await this.sendResponse(remoteJid, {
             text: template.content,
             templateKey: template.key,
             attachments: template.attachments ? JSON.parse(template.attachments) : null
-        }, lead);
+        }, lead, instance.id);
     }
 
-    async processMessage(data: { remoteJid: string; phoneNumber?: string; text: string; name?: string; messageId: string }) {
-        const { remoteJid, phoneNumber: phoneNumberFromData, text, name, messageId } = data;
+    async processMessage(data: { remoteJid: string; phoneNumber?: string; text: string; name?: string; messageId: string, tenantId: string, instanceId: string }) {
+        const { remoteJid, phoneNumber: phoneNumberFromData, text, name, messageId, tenantId, instanceId } = data;
 
-        this.logger.log(`[DEBUG] processMessage called with data:`, { remoteJid, phoneNumberFromData, text: text.substring(0, 50), messageId });
+        this.logger.log(`[DEBUG] processMessage called for ${remoteJid} on instance ${instanceId}`);
 
-        // Deduplication Logic
         if (this.processedMessages.has(messageId)) {
-            this.logger.warn(`Ignoring duplicate message ID: ${messageId}`);
             return;
         }
         this.processedMessages.add(messageId);
-        // Clean up cache after 15 seconds
         setTimeout(() => this.processedMessages.delete(messageId), 15000);
 
-        // Get grouping settings
         const settings = await this.settingsService.getChatbotSettings();
+        const bufferKey = `${instanceId}:${remoteJid}`;
 
         if (settings.messageGroupingEnabled) {
-            this.logger.log(`[GROUPING] Adding message to buffer for ${remoteJid}: ${text}`);
-
-            let buffer = this.messageBuffers.get(remoteJid);
+            let buffer = this.messageBuffers.get(bufferKey);
 
             if (buffer) {
                 clearTimeout(buffer.timeout);
@@ -82,62 +126,51 @@ export class WhatsappService {
                 buffer = {
                     messages: [{ text, messageId }],
                     name: name || 'Usuario',
-                    phoneNumber: phoneNumberFromData || this.extractPhoneFromJid(remoteJid),
-                    timeout: null
+                    phoneNumber: phoneNumberFromData,
+                    timeout: null,
+                    tenantId,
+                    instanceId
                 };
             }
 
             buffer.timeout = setTimeout(() => {
-                this.executeBatchProcess(remoteJid);
+                this.executeBatchProcess(bufferKey);
             }, settings.messageGroupingTimeout);
 
-            this.messageBuffers.set(remoteJid, buffer);
+            this.messageBuffers.set(bufferKey, buffer);
             return;
         }
 
-        // Si no está habilitada la agrupación, procesar individualmente (comportamiento anterior refactorizado)
-        await this.executeProcessing(remoteJid, phoneNumberFromData, [{ text, messageId }], name);
+        await this.executeProcessing(remoteJid, phoneNumberFromData, [{ text, messageId }], name, tenantId, instanceId);
     }
 
-    private async executeBatchProcess(remoteJid: string) {
-        const buffer = this.messageBuffers.get(remoteJid);
+    private async executeBatchProcess(bufferKey: string) {
+        const buffer = this.messageBuffers.get(bufferKey);
         if (!buffer) return;
 
-        this.messageBuffers.delete(remoteJid);
+        this.messageBuffers.delete(bufferKey);
+        const remoteJid = bufferKey.split(':')[1];
 
-        this.logger.log(`[GROUPING] Executing batch process for ${remoteJid} with ${buffer.messages.length} messages`);
-        await this.executeProcessing(remoteJid, buffer.phoneNumber, buffer.messages, buffer.name);
+        await this.executeProcessing(remoteJid, buffer.phoneNumber, buffer.messages, buffer.name, buffer.tenantId, buffer.instanceId);
     }
 
-    private async executeProcessing(remoteJid: string, phoneNumberFromData: string, messages: { text: string, messageId: string }[], name: string) {
-        // Normalizar texto: unir sin espacios excesivos y convertir ráfagas fragmentadas
-        // "re ", "qui ", "sitos" -> "re qui sitos"
+    private async executeProcessing(remoteJid: string, phoneNumberFromData: string, messages: { text: string, messageId: string }[], name: string, tenantId: string, instanceId: string) {
         const combinedText = messages.map(m => m.text).join(' ').replace(/\s+/g, ' ').trim();
-
         if (!combinedText) return;
 
-        this.logger.log(`Processing message(s) from ${remoteJid} (phone: ${phoneNumberFromData}): ${combinedText}`);
-
-        // 1. Find or Create Lead
         let phoneToSave = phoneNumberFromData;
-
         if (!phoneToSave) {
-            phoneToSave = this.extractPhoneFromJid(remoteJid);
-            if (!phoneToSave || phoneToSave.length < 8) {
-                this.logger.error(`CRITICAL: Cannot extract valid phone number from ${remoteJid}`);
-                return;
+            if (remoteJid.includes('@s.whatsapp.net')) {
+                phoneToSave = remoteJid.split('@')[0].replace(/\D/g, '');
+            } else {
+                phoneToSave = remoteJid.split('@')[0].replace(/\D/g, '');
             }
         }
 
-        if (!/^\d{8,}$/.test(phoneToSave)) {
-            this.logger.error(`CRITICAL: Invalid phone number format: ${phoneToSave}`);
-            return;
-        }
+        if (!phoneToSave || phoneToSave.length < 5) return;
 
-        const lead = await this.leadsService.findOrCreate(phoneToSave, name);
+        const lead = await this.leadsService.findOrCreate(phoneToSave, tenantId, name);
 
-        // 2. Log Inbound Interaction (log separately for transparency, or combined?)
-        // Log combined interaction for the conversation view
         await this.interactionsService.logInteraction({
             leadId: lead.id,
             direction: Direction.INBOUND,
@@ -145,30 +178,24 @@ export class WhatsappService {
             content: combinedText,
         });
 
-        // Emit to WebSocket
         this.chatGateway.emitMessageToRoom(lead.id, {
             direction: 'INBOUND',
             content: combinedText,
             createdAt: new Date(),
             messageType: 'TEXT',
+            instanceId
         });
 
-        // CHECK HANDOVER
         if (lead.isHandoverActive) {
             this.logsService.addLog('log', `Message received from ${lead.phone} while Handover is ACTIVE. Bot is silent.`, 'WhatsappService');
             return;
         }
 
-        // 3. Determine Response
         const responses = await this.handleIntents(combinedText, lead);
 
-        // 4. Send Responses
         if (responses && responses.length > 0) {
             for (const response of responses) {
-                await this.sendResponse(remoteJid, response, lead);
-                this.logsService.addLog('log', `Bot response sent to ${remoteJid}: ${response.text?.substring(0, 100)}...`, 'WhatsappService');
-
-                // Pequeño delay entre respuestas múltiples para que no lleguen instantáneamente si no hay delay configurado
+                await this.sendResponse(remoteJid, response, lead, instanceId);
                 if (responses.length > 1) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
@@ -182,34 +209,25 @@ export class WhatsappService {
         const lowerText = text.toLowerCase();
         const responses: { text: string; templateKey?: string; attachments?: any, statusUpdate?: LeadStatus }[] = [];
 
-        // --- RULE BASED MATCHING (Pre-IA) ---
-        // Se pueden acumular múltiples respuestas de reglas si es necesario
-
-        // Greeting
+        // --- RULE BASED MATCHING ---
         if (lowerText.match(/hola|buen|info|inicio/)) {
             const t = await this.templatesService.findByKey('bienvenida');
             if (t) responses.push({ text: t.content, templateKey: t.key, attachments: t.attachments ? JSON.parse(t.attachments) : null });
         }
 
-        // Careers
         if (lowerText.includes('medicina')) {
-            await this.leadsService.updateInterest(lead.phone, 'MEDICINA');
+            await this.leadsService.updateInterest(lead.id, 'MEDICINA');
             const t = await this.templatesService.findByKey('brochure_medicina');
             if (t) responses.push({ text: t.content, templateKey: t.key, attachments: t.attachments ? JSON.parse(t.attachments) : null, statusUpdate: LeadStatus.INTERESADO_BROCHURE });
         }
 
         if (lowerText.includes('derecho') || lowerText.includes('abogado') || lowerText.includes('leyes')) {
-            await this.leadsService.updateInterest(lead.phone, 'DERECHO');
+            await this.leadsService.updateInterest(lead.id, 'DERECHO');
             const t = await this.templatesService.findByKey('brochure_derecho');
             if (t) responses.push({ text: t.content, templateKey: t.key, attachments: t.attachments ? JSON.parse(t.attachments) : null, statusUpdate: LeadStatus.INTERESADO_BROCHURE });
         }
 
-        // Si ya tenemos respuestas de reglas, podríamos saltarnos la IA o complementarla.
-        // En este caso, si ya hay respuestas (ej. saludo + brochure), buscaremos si hay más intents específicos con la IA
-        // pero evitando duplicar lo que ya procesamos manualmente.
-
-        // --- OPENAI FALLBACK / COMPLEX MATCHING ---
-        // Contextualize Query
+        // --- OPENAI FALLBACK ---
         let searchContext = text;
         if (lead.careerInterest) searchContext += ` ${lead.careerInterest}`;
 
@@ -225,28 +243,27 @@ export class WhatsappService {
 
         if (classification.needs_human) {
             await this.leadsService.toggleHandover(lead.id, true);
-            await this.leadsService.updateStatus(lead.phone, LeadStatus.NECESITA_ASESOR);
+            await this.leadsService.updateStatus(lead.id, LeadStatus.NECESITA_ASESOR); // switched to ID
             this.logsService.addHandoverAlert(lead.id, lead.phone, lead.fullName, `Asistencia humana: "${text.substring(0, 100)}"`);
 
             const remoteJidForTimeout = lead.phone.includes('@') ? lead.phone : `${lead.phone}@s.whatsapp.net`;
-            this.scheduleHandoverTimeout(lead.id, remoteJidForTimeout);
+            this.scheduleHandoverTimeout(lead.id, remoteJidForTimeout); // Needs to handle multi-instance? Logic calls sendResponse, so we need instance to reply.
+            // But Schedule creates a timeout. When it fires, we need an instance.
+            // We'll solve that in `scheduleHandoverTimeout`.
 
             const t = await this.templatesService.findByKey('necesita_asesor');
             responses.push(t ? { text: t.content, templateKey: t.key } : { text: "Un asesor te contactará.", templateKey: 'fallback' });
             return responses;
         }
 
-        // Deduplicar claves devueltas por la IA para evitar respuestas dobles
         const uniqueTemplateKeys = [...new Set(classification.template_keys)];
 
         for (const key of uniqueTemplateKeys) {
-            // Evitar duplicados si la regla manual ya lo agregó
             if (responses.some(r => r.templateKey === key)) continue;
 
             const t = await this.templatesService.findByKey(key);
             if (t) {
                 let finalText = t.content;
-                // Agregar extra_text solo a la última respuesta
                 if (key === classification.template_keys[classification.template_keys.length - 1] && classification.extra_text) {
                     finalText += `\n\n${classification.extra_text}`;
                 }
@@ -261,15 +278,8 @@ export class WhatsappService {
         return responses;
     }
 
-    private async handleIntent(text: string, lead: any): Promise<{ text: string; templateKey?: string; attachments?: any, statusUpdate?: LeadStatus } | null> {
-        // Este método queda obsoleto pero se mantiene por si hay llamadas internas o para una migración limpia
-        const results = await this.handleIntents(text, lead);
-        return results.length > 0 ? results[0] : null;
-
-    }
-
-    private async sendResponse(remoteJid: string, response: any, lead: any) {
-        this.logger.log(`[DEBUG] sendResponse called for ${remoteJid} with response:`, { text: response.text?.substring(0, 50), templateKey: response.templateKey });
+    private async sendResponse(remoteJid: string, response: any, lead: any, instanceId: string) {
+        this.logger.log(`[DEBUG] sendResponse called for ${remoteJid} on instance ${instanceId}`);
 
         if (response.attachments && response.attachments.length > 0) {
             const attachmentPath = response.attachments[0];
@@ -289,12 +299,12 @@ export class WhatsappService {
 
             if (buffer) {
                 if (attachmentPath.endsWith('.pdf')) {
-                    await this.baileysService.sendMessage(remoteJid, { document: buffer, mimetype: 'application/pdf', fileName: 'Brochure.pdf', caption: response.text });
+                    await this.baileysService.sendMessage(instanceId, remoteJid, { document: buffer, mimetype: 'application/pdf', fileName: 'Brochure.pdf', caption: response.text });
                 } else {
-                    await this.baileysService.sendMessage(remoteJid, { image: buffer, caption: response.text });
+                    await this.baileysService.sendMessage(instanceId, remoteJid, { image: buffer, caption: response.text });
                 }
             } else {
-                await this.baileysService.sendMessage(remoteJid, { text: response.text + "\n(Adjunto no disponible)" });
+                await this.baileysService.sendMessage(instanceId, remoteJid, { text: response.text + "\n(Adjunto no disponible)" });
             }
 
             await this.interactionsService.logInteraction({
@@ -307,7 +317,7 @@ export class WhatsappService {
             });
         } else {
             // Send Text
-            await this.baileysService.sendMessage(remoteJid, { text: response.text });
+            await this.baileysService.sendMessage(instanceId, remoteJid, { text: response.text });
             await this.interactionsService.logInteraction({
                 leadId: lead.id,
                 direction: Direction.OUTBOUND,
@@ -319,75 +329,46 @@ export class WhatsappService {
         }
 
         if (response.statusUpdate) {
-            await this.leadsService.updateStatus(lead.phone, response.statusUpdate);
+            await this.leadsService.updateStatus(lead.id, response.statusUpdate);
         }
-    }
-
-    /**
-     * Extrae el número de teléfono de un JID como fallback
-     * @param jid - El JID completo
-     * @returns El número de teléfono normalizado
-     */
-    private extractPhoneFromJid(jid: string): string {
-        // Si tiene @s.whatsapp.net, extraer el número
-        if (jid.includes('@s.whatsapp.net')) {
-            return jid.split('@')[0].replace(/\D/g, '');
-        }
-        // Si es un LID, intentar extraer cualquier número
-        const phone = jid.split('@')[0].replace(/\D/g, '');
-        return phone || jid; // Fallback al JID completo si no hay número
-    }
-
-    async getBotStatus() {
-        return this.baileysService.getBotInfo();
-    }
-
-    async getBotProfilePicture() {
-        return this.baileysService.getBotProfilePicture();
-    }
-
-    async startConnection() {
-        return this.baileysService.startConnection();
-    }
-
-    async logout() {
-        return this.baileysService.logout();
     }
 
     private scheduleHandoverTimeout(leadId: string, remoteJid: string) {
-        // Cancelar cualquier timeout existente para este lead
         this.cancelHandoverTimeout(leadId);
 
-        // Programar reactivación en 30 minutos (1800000 ms)
         const timeout = setTimeout(async () => {
             try {
-                // Verificar si el handover sigue activo
-                const lead = await this.leadsService.findOrCreate(remoteJid.split('@')[0], 'Unknown');
+                // Determine tenant and instance
+                // We need to fetch lead to get tenantId
+                const lead = await this.leadsService.findById(leadId);
                 if (lead && lead.isHandoverActive) {
-                    // Reactivar el bot
                     await this.leadsService.toggleHandover(leadId, false);
 
-                    // Enviar mensaje de seguimiento
                     const followUpTemplate = await this.templatesService.findByKey('follow_up_no_response');
                     const message = followUpTemplate
                         ? followUpTemplate.content
                         : "Hola! ¿Sigues interesado en información sobre nuestras carreras? Un asesor estará disponible pronto.";
 
-                    await this.sendResponse(remoteJid, { text: message, templateKey: 'follow_up' }, lead);
+                    // Finding instance to reply
+                    if (lead.tenantId) {
+                        const instance = await this.prisma.whatsappInstance.findFirst({
+                            where: { tenantId: lead.tenantId, status: 'CONNECTED' }
+                        });
+                        if (instance) {
+                            await this.sendResponse(remoteJid, { text: message, templateKey: 'follow_up' }, lead, instance.id);
+                        }
+                    }
 
                     this.logsService.addLog('log', `Handover timeout reached for lead ${lead.phone}, bot reactivated`, 'WhatsappService');
                 }
             } catch (error) {
                 this.logger.error(`Error in handover timeout for lead ${leadId}:`, error);
             } finally {
-                // Limpiar el timeout del mapa
                 this.handoverTimeouts.delete(leadId);
             }
-        }, 30 * 60 * 1000); // 30 minutos
+        }, 30 * 60 * 1000);
 
-        // Almacenar el timeout
         this.handoverTimeouts.set(leadId, timeout);
-
         this.logger.log(`Handover timeout scheduled for lead ${leadId} in 30 minutes`);
     }
 
@@ -400,11 +381,20 @@ export class WhatsappService {
         }
     }
 
-    // Método público para enviar mensajes desde asesores
-    async sendAdvisorMessage(remoteJid: string, message: string, lead: any) {
+    async sendAdvisorMessage(remoteJid: string, message: string, lead: any, instanceId?: string) {
+        let targetInstanceId = instanceId;
+        if (!targetInstanceId) {
+            const instance = await this.prisma.whatsappInstance.findFirst({
+                where: { tenantId: lead.tenantId, status: 'CONNECTED' }
+            });
+            targetInstanceId = instance?.id;
+        }
+
+        if (!targetInstanceId) throw new Error('No connected instance found');
+
         return this.sendResponse(remoteJid, {
             text: message,
             templateKey: 'advisor_message'
-        }, lead);
+        }, lead, targetInstanceId);
     }
 }

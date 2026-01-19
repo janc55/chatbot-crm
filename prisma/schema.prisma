@@ -7,9 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
+
 model Lead {
   id              String        @id @default(uuid())
-  phone           String        @unique
+  phone           String
   fullName        String?       @map("full_name")
   careerInterest  String?       @map("career_interest")
   source          String        @default("unknown")
@@ -22,7 +24,9 @@ model Lead {
   tenant          Tenant?       @relation(fields: [tenantId], references: [id])
 
   @@map("leads")
+  @@unique([phone, tenantId])
 }
+
 
 model Interaction {
   id          String          @id @default(uuid())
@@ -68,19 +72,36 @@ model Setting {
 }
 
 model Tenant {
-  id               String   @id @default(uuid())
-  name             String
-  domain           String?  @unique
-  maxUsers         Int      @default(5) @map("max_users")
-  subscriptionPlan String   @default("FREE") @map("subscription_plan")
-  createdAt        DateTime @default(now()) @map("created_at")
-  users            User[]
-  leads            Lead[]
-  templates        Template[]
-  settings         Setting[]
-  quickReplies     QuickReply[]
+  id                  String             @id @default(uuid())
+  name                String
+  domain              String?            @unique
+  maxUsers            Int                @default(5) @map("max_users")
+  maxWhatsappInstances Int               @default(1) @map("max_whatsapp_instances")
+  subscriptionPlan    String             @default("FREE") @map("subscription_plan")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  users               User[]
+  leads               Lead[]
+  templates           Template[]
+  settings            Setting[]
+  quickReplies        QuickReply[]
+  whatsappInstances   WhatsappInstance[]
 
   @@map("tenants")
+}
+
+model WhatsappInstance {
+  id          String   @id @default(uuid())
+  name        String   @default("Main")
+  sessionId   String   @unique @map("session_id")
+  phoneNumber String?  @map("phone_number")
+  status      String   @default("DISCONNECTED") // DISCONNECTED, CONNECTING, CONNECTED
+  qrCode      String?  @map("qr_code") // Temporal storage if needed, or just for cache
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  tenantId    String   @map("tenant_id")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@map("whatsapp_instances")
 }
 
 model User {

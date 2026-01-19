@@ -39,20 +39,20 @@ describe('LeadsService', () => {
             const lead = { id: '1', phone: '123' };
             mockPrisma.lead.findUnique.mockResolvedValue(lead);
 
-            const result = await service.findOrCreate('123');
+            const result = await service.findOrCreate('123', 'tenant-1');
             expect(result).toEqual(lead);
             expect(mockPrisma.lead.create).not.toHaveBeenCalled();
         });
 
         it('should create new lead if not found', async () => {
-            const lead = { id: '1', phone: '123', status: LeadStatus.NUEVO };
+            const lead = { id: '1', phone: '123', tenantId: 'tenant-1', status: LeadStatus.NUEVO };
             mockPrisma.lead.findUnique.mockResolvedValue(null);
             mockPrisma.lead.create.mockResolvedValue(lead);
 
-            const result = await service.findOrCreate('123', 'John');
+            const result = await service.findOrCreate('123', 'tenant-1', 'John');
             expect(result).toEqual(lead);
             expect(mockPrisma.lead.create).toHaveBeenCalledWith({
-                data: { phone: '123', fullName: 'John', status: LeadStatus.NUEVO },
+                data: { phone: '123', tenantId: 'tenant-1', fullName: 'John', status: LeadStatus.NUEVO },
             });
         });
     });

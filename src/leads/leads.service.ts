@@ -6,30 +6,38 @@ import { Lead, LeadStatus } from '@prisma/client';
 export class LeadsService {
     constructor(private prisma: PrismaService) { }
 
-    async findOrCreate(phone: string, name?: string): Promise<Lead> {
-        console.log(`[LeadsService] finding or creating lead for phone: ${phone}`);
-        const lead = await this.prisma.lead.findUnique({ where: { phone } });
+    async findOrCreate(phone: string, tenantId: string, name?: string): Promise<Lead> {
+        console.log(`[LeadsService] finding or creating lead for phone: ${phone}, tenant: ${tenantId}`);
+        const lead = await this.prisma.lead.findUnique({
+            where: {
+                phone_tenantId: {
+                    phone,
+                    tenantId
+                }
+            }
+        });
         if (lead) return lead;
 
         return this.prisma.lead.create({
             data: {
                 phone,
+                tenantId,
                 fullName: name,
                 status: LeadStatus.NUEVO,
             },
         });
     }
 
-    async updateInterest(phone: string, career: string) {
+    async updateInterest(id: string, career: string) {
         return this.prisma.lead.update({
-            where: { phone },
+            where: { id },
             data: { careerInterest: career, status: LeadStatus.INTERESADO_BROCHURE },
         });
     }
 
-    async updateStatus(phone: string, status: LeadStatus) {
+    async updateStatus(id: string, status: LeadStatus) {
         return this.prisma.lead.update({
-            where: { phone },
+            where: { id },
             data: { status },
         });
     }
