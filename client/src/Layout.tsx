@@ -160,15 +160,6 @@ export default function Layout() {
                                 {user?.role === 'ADMIN' && (
                                     <>
                                         <Link
-                                            to="/settings"
-                                            className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${isActive('/settings')
-                                                ? 'bg-[#A7CF3B] text-[#064A6F]'
-                                                : 'text-white hover:bg-[#0a5a87]'
-                                                }`}
-                                        >
-                                            Settings
-                                        </Link>
-                                        <Link
                                             to="/logs"
                                             className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${isActive('/logs')
                                                 ? 'bg-[#A7CF3B] text-[#064A6F]'
@@ -184,7 +175,6 @@ export default function Layout() {
                                                 : 'text-white hover:bg-[#0a5a87]'
                                                 }`}
                                         >
-                                            <UsersIcon className="h-5 w-5 mr-1" />
                                             Usuarios
                                         </Link>
                                     </>
