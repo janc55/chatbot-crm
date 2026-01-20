@@ -40,8 +40,9 @@ const Users: React.FC = () => {
             setUsers(res.data);
             // Simular límite (en una versión real esto vendría del tenant en el login o un endpoint de config)
             setStats(prev => ({ ...prev, used: res.data.length }));
-        } catch (error) {
-            toast.error('Error al cargar usuarios');
+        } catch (error: any) {
+            console.error(error);
+            toast.error(error.response?.data?.message || 'Error al cargar usuarios');
         } finally {
             setLoading(false);
         }

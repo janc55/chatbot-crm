@@ -211,12 +211,22 @@ export class BaileysService implements OnModuleInit, OnModuleDestroy {
                             const originalJid = msg.key.remoteJid;
                             let phoneNumber: string;
 
-                            // Simplified phone extraction
-                            if (originalJid.includes('@s.whatsapp.net')) {
+                            // Priority 1: Extract from senderPn if available (for @lid JIDs)
+                            // @ts-ignore - senderPn is not in Baileys types but exists in messages
+                            const senderPn = msg.verifiedBizName || msg.senderPn || (msg as any).senderPn;
+
+                            if (senderPn) {
+                                // senderPn usually comes in format like "59172454767" or with country code
+                                phoneNumber = senderPn.replace(/\D/g, '');
+                                console.log(`[BaileysService] Extracted phone from senderPn: ${phoneNumber}`);
+                            } else if (originalJid.includes('@s.whatsapp.net')) {
+                                // Priority 2: Standard JID format
                                 phoneNumber = originalJid.split('@')[0].replace(/\D/g, '');
+                                console.log(`[BaileysService] Extracted phone from standard JID: ${phoneNumber}`);
                             } else {
-                                // Basic fallback
+                                // Priority 3: Fallback - extract from any JID format
                                 phoneNumber = originalJid.split('@')[0].replace(/\D/g, '');
+                                console.log(`[BaileysService] Extracted phone from JID (fallback): ${phoneNumber} from ${originalJid}`);
                             }
 
                             if (phoneNumber && phoneNumber.length >= 8) {

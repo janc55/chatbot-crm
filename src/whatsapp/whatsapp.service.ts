@@ -149,7 +149,10 @@ export class WhatsappService {
         if (!buffer) return;
 
         this.messageBuffers.delete(bufferKey);
-        const remoteJid = bufferKey.split(':')[1];
+        // bufferKey format is: ${instanceId}:${remoteJid}
+        // remoteJid can contain : in rare cases, so split on first occurrence only
+        const firstColonIndex = bufferKey.indexOf(':');
+        const remoteJid = bufferKey.substring(firstColonIndex + 1);
 
         await this.executeProcessing(remoteJid, buffer.phoneNumber, buffer.messages, buffer.name, buffer.tenantId, buffer.instanceId);
     }
@@ -169,6 +172,7 @@ export class WhatsappService {
 
         if (!phoneToSave || phoneToSave.length < 5) return;
 
+        console.log(`[WhatsappService] phoneToSave: ${phoneToSave}, phoneNumberFromData: ${phoneNumberFromData}, remoteJid: ${remoteJid}`);
         const lead = await this.leadsService.findOrCreate(phoneToSave, tenantId, name);
 
         await this.interactionsService.logInteraction({

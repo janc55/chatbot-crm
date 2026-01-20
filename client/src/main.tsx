@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './Layout';
@@ -16,35 +16,14 @@ import { ChatProvider } from './context/ChatContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute, AdminRoute } from './utils/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
-import api from './api';
+
 import './index.css';
+import InstancesDashboard from './InstancesDashboard';
 
 function AppContent() {
   const { user, loading: authLoading } = useAuth();
-  const [isConnected, setIsConnected] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      checkConnection();
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
-
-  const checkConnection = async () => {
-    try {
-      const response = await api.get('/webhook/whatsapp/status');
-      setIsConnected(response.data.status === 'connected');
-    } catch (error) {
-      console.error('Error checking connection:', error);
-      setIsConnected(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (authLoading || (user && loading)) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -53,12 +32,6 @@ function AppContent() {
         </div>
       </div>
     );
-  }
-
-  // If logged in but not connected, show connection page
-  // Except for admin routes or specific cases if needed
-  if (user && isConnected === false) {
-    return <WhatsAppConnect onConnected={() => setIsConnected(true)} />;
   }
 
   return (
@@ -75,6 +48,8 @@ function AppContent() {
         <Route path="leads/:id" element={<LeadDetail />} />
         <Route path="quick-replies" element={<QuickReplies />} />
         <Route path="templates" element={<Templates />} />
+
+        {/* Admin Routes */}
         <Route path="settings" element={
           <AdminRoute>
             <Settings />
@@ -88,6 +63,16 @@ function AppContent() {
         <Route path="users" element={
           <AdminRoute>
             <Users />
+          </AdminRoute>
+        } />
+        <Route path="instances" element={
+          <AdminRoute>
+            <InstancesDashboard />
+          </AdminRoute>
+        } />
+        <Route path="instances/:id/connect" element={
+          <AdminRoute>
+            <WhatsAppConnect />
           </AdminRoute>
         } />
       </Route>

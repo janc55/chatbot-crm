@@ -13,6 +13,7 @@ export class UsersController {
     @Roles(Role.ADMIN)
     @Get()
     async findAll(@Request() req: any) {
+        // console.log('GET /users user:', req.user);
         return this.usersService.findAllByTenant(req.user.tenantId);
     }
 

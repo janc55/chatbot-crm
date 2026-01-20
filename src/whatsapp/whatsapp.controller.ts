@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param, Query, NotFoundException, HttpCode, Inject, forwardRef } from '@nestjs/common';
+import { Controller, Post, Body, Get, Delete, Param, Query, NotFoundException, HttpCode, Inject, forwardRef } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { BaileysService } from './baileys.service';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -28,6 +28,12 @@ export class WhatsappController {
     @ApiOperation({ summary: 'Create a new WhatsApp instance for a tenant' })
     async createInstance(@Body() body: { tenantId: string, name: string }) {
         return this.whatsappService.createInstance(body.tenantId, body.name);
+    }
+
+    @Delete('instances/:id')
+    @ApiOperation({ summary: 'Delete a WhatsApp instance' })
+    async deleteInstance(@Param('id') id: string) {
+        return this.whatsappService.deleteInstance(id);
     }
 
     @Get('instances')

@@ -1,21 +1,30 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from './api';
+import toast from 'react-hot-toast';
 
 interface WhatsAppConnectProps {
-    onConnected: () => void;
+    onConnected?: () => void;
+    instanceIdProp?: string;
 }
 
-export default function WhatsAppConnect({ onConnected }: WhatsAppConnectProps) {
+export default function WhatsAppConnect({ onConnected, instanceIdProp }: WhatsAppConnectProps) {
+    const { id } = useParams<{ id: string }>();
+    const instanceId = instanceIdProp || id;
+    const navigate = useNavigate();
+
     const [botInfo, setBotInfo] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [connecting, setConnecting] = useState(false);
 
     const checkStatus = async () => {
+        if (!instanceId) return;
         try {
-            const response = await api.get('/webhook/whatsapp/status');
+            const response = await api.get(`/webhook/whatsapp/instances/${instanceId}/status`);
             setBotInfo(response.data);
-            if (response.data.status === 'connected') {
-                onConnected();
+            if (response.data.status === 'CONNECTED') {
+                if (onConnected) onConnected();
+                else toast.success('¡Conectado exitosamente!');
             }
         } catch (error) {
             console.error('Error checking status:', error);
@@ -25,51 +34,82 @@ export default function WhatsAppConnect({ onConnected }: WhatsAppConnectProps) {
     };
 
     const handleConnect = async () => {
+        if (!instanceId) return;
         setConnecting(true);
         try {
-            await api.post('/webhook/whatsapp/connect');
+            await api.post(`/webhook/whatsapp/instances/${instanceId}/connect`);
+            toast('Iniciando conexión...', { icon: '🔄' });
             // Esperar un poco y luego verificar el estado
             setTimeout(checkStatus, 2000);
         } catch (error) {
             console.error('Error connecting:', error);
-            alert('Error al iniciar conexión');
+            toast.error('Error al iniciar conexión');
         } finally {
             setConnecting(false);
         }
     };
 
     useEffect(() => {
+        if (!instanceId) {
+            setLoading(false);
+            return;
+        }
+
         checkStatus();
-        // Verificar estado cada 5 segundos si no está conectado
+        // Verificar estado cada 3 segundos
         const interval = setInterval(() => {
-            if (!botInfo || botInfo.status !== 'connected') {
-                checkStatus();
-            }
-        }, 5000);
+            checkStatus();
+        }, 3000);
 
         return () => clearInterval(interval);
-    }, [botInfo]);
+    }, [instanceId]);
+
+    if (!instanceId) {
+        return <div className="p-8 text-center">No Instance ID provided</div>;
+    }
 
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#064A6F] mx-auto mb-4"></div>
-                    <p className="text-[#064A6F] font-medium">Verificando estado del bot...</p>
+                    <p className="text-[#064A6F] font-medium">Verificando estado de la instancia...</p>
                 </div>
             </div>
         );
     }
 
-    if (botInfo?.status === 'connected') {
-        // Redirigir al dashboard si ya está conectado
-        window.location.href = '/';
-        return null;
+    if (botInfo?.status === 'CONNECTED') {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+                    <div className="text-green-500 mb-4">
+                        <svg className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Conectado!</h2>
+                    <p className="text-gray-600 mb-6">Esta instancia está vinculada correctamente.</p>
+
+                    <button
+                        onClick={() => navigate('/instances')}
+                        className="bg-[#064A6F] text-white px-4 py-2 rounded-md hover:bg-[#053a57]"
+                    >
+                        Volver al Dashboard
+                    </button>
+                </div>
+            </div>
+        )
     }
 
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
             <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+                <div className="mb-4">
+                    <button onClick={() => navigate('/instances')} className="text-sm text-gray-500 hover:text-gray-700 flex items-center">
+                        ← Volver
+                    </button>
+                </div>
                 <div className="text-center mb-8">
                     <div className="mx-auto h-16 w-16 bg-[#A7CF3B] rounded-full flex items-center justify-center mb-4">
                         <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -77,26 +117,26 @@ export default function WhatsAppConnect({ onConnected }: WhatsAppConnectProps) {
                         </svg>
                     </div>
                     <h1 className="text-2xl font-bold text-[#064A6F] mb-2">Conectar WhatsApp</h1>
-                    <p className="text-gray-600">Conecta tu chatbot con WhatsApp</p>
+                    <p className="text-gray-600">Instancia: <span className="font-semibold">{botInfo?.instanceName || instanceId}</span></p>
                 </div>
 
                 {botInfo?.qr && (
                     <div className="text-center mb-6">
-                        <p className="text-sm text-gray-600 mb-4">Escanea este código QR con WhatsApp:</p>
+                        <p className="text-sm text-gray-600 mb-4">Escanea exte código QR con WhatsApp:</p>
                         <div className="bg-white p-4 rounded-lg border-2 border-gray-200 inline-block">
                             <img
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(botInfo.qr)}`}
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(botInfo.qr)}`}
                                 alt="QR Code"
-                                className="w-48 h-48"
+                                className="w-56 h-56"
                             />
                         </div>
                         <p className="text-xs text-gray-500 mt-2">
-                            Abre WhatsApp → Menú → Dispositivos Vinculados → Agregar Dispositivo → Escanear código
+                            Abre WhatsApp → Menú → Dispositivos Vinculados → Agregar Dispositivo → Escanear
                         </p>
                     </div>
                 )}
 
-                {!botInfo?.qr && botInfo?.status !== 'connecting' && (
+                {(!botInfo?.qr && botInfo?.status !== 'CONNECTING') && (
                     <div className="text-center mb-6">
                         <button
                             onClick={handleConnect}
@@ -109,14 +149,20 @@ export default function WhatsAppConnect({ onConnected }: WhatsAppConnectProps) {
                                     Conectando...
                                 </>
                             ) : (
-                                'Iniciar Conexión'
+                                'Generar nuevo QR'
                             )}
                         </button>
                     </div>
                 )}
 
+                {(botInfo?.status === 'CONNECTING' && !botInfo?.qr) && (
+                    <div className="text-center mb-6 text-gray-500 italic">
+                        Esperando QR...
+                    </div>
+                )}
+
                 <div className="text-center text-sm text-gray-500">
-                    <p>Una vez conectado, podrás gestionar leads y respuestas automáticamente.</p>
+                    <p>Mantén esta ventana abierta mientras escaneas.</p>
                 </div>
             </div>
         </div>
