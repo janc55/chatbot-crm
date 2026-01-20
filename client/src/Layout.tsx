@@ -1,6 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { BellIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from './context/AuthContext';
 import api from './api';
@@ -29,7 +28,17 @@ export default function Layout() {
     // Ref para cerrar al clic fuera
     const notificationRef = useRef<HTMLDivElement>(null);
 
+    const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
     const isActive = (path: string) => location.pathname === path;
+
+    // Estilos comunes para los links del sidebar
+    const navItemClass = (path: string) => `
+        flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group
+        ${isActive(path) 
+            ? 'bg-[#0c4a6f] text-white shadow-lg shadow-[#0c4a6f]/20' 
+            : 'text-gray-500 hover:bg-gray-100 hover:text-[#0c4a6f]'}
+    `;
 
     // Fetch de notificaciones de handover
     useEffect(() => {
@@ -82,249 +91,200 @@ export default function Layout() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
-            <Toaster
-                position="top-right"
-                toastOptions={{
-                    duration: 3000,
-                    style: {
-                        background: '#064A6F',
-                        color: '#fff',
-                    },
-                    success: {
-                        duration: 3000,
-                        iconTheme: {
-                            primary: '#A7CF3B',
-                            secondary: '#064A6F',
-                        },
-                    },
-                    error: {
-                        duration: 4000,
-                        iconTheme: {
-                            primary: '#ef4444',
-                            secondary: '#fff',
-                        },
-                    },
-                }}
-            />
-            <nav className="bg-[#064A6F] shadow-lg">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16 items-stretch">
-                        <div className="flex">
-                            <div className="flex-shrink-0 flex items-center">
-                                <img
-                                    src="/images/nettidev.svg"
-                                    alt="Logo"
-                                    className="h-10 w-10 mr-3"
-                                />
-                                <span className="font-bold text-xl text-white">Chatbot CRM</span>
-                            </div>
-                            <div className="hidden sm:ml-8 sm:flex sm:items-stretch">
-                                <Link
-                                    to="/"
-                                    className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${isActive('/')
-                                        ? 'bg-[#A7CF3B] text-[#064A6F]'
-                                        : 'text-white hover:bg-[#0a5a87]'
-                                        }`}
-                                >
-                                    Dashboard
-                                </Link>
-                                <Link
-                                    to="/leads"
-                                    className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${isActive('/leads')
-                                        ? 'bg-[#A7CF3B] text-[#064A6F]'
-                                        : 'text-white hover:bg-[#0a5a87]'
-                                        }`}
-                                >
-                                    Leads
-                                </Link>
-                                <Link
-                                    to="/templates"
-                                    className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${isActive('/templates')
-                                        ? 'bg-[#A7CF3B] text-[#064A6F]'
-                                        : 'text-white hover:bg-[#0a5a87]'
-                                        }`}
-                                >
-                                    Templates
-                                </Link>
-                                <Link
-                                    to="/quick-replies"
-                                    className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${isActive('/quick-replies')
-                                        ? 'bg-[#A7CF3B] text-[#064A6F]'
-                                        : 'text-white hover:bg-[#0a5a87]'
-                                        }`}
-                                >
-                                    Respuestas Rápidas
-                                </Link>
+        <div className="flex min-h-screen bg-[#f8fafc] font-sans">
+            <Toaster position="top-right" />
 
-                                {user?.role === 'ADMIN' && (
-                                    <>
-                                        <Link
-                                            to="/logs"
-                                            className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${isActive('/logs')
-                                                ? 'bg-[#A7CF3B] text-[#064A6F]'
-                                                : 'text-white hover:bg-[#0a5a87]'
-                                                }`}
-                                        >
-                                            Logs
-                                        </Link>
-                                        <Link
-                                            to="/users"
-                                            className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${isActive('/users')
-                                                ? 'bg-[#A7CF3B] text-[#064A6F]'
-                                                : 'text-white hover:bg-[#0a5a87]'
-                                                }`}
-                                        >
-                                            Usuarios
-                                        </Link>
-                                        <Link
-                                            to="/instances"
-                                            className={`flex h-full items-center justify-center px-8 text-sm font-medium transition-colors ${isActive('/instances') || isActive('/instances/') // Crude partial match or precise
-                                                || location.pathname.startsWith('/instances')
-                                                ? 'bg-[#A7CF3B] text-[#064A6F]'
-                                                : 'text-white hover:bg-[#0a5a87]'
-                                                }`}
-                                        >
-                                            Conexiones
-                                        </Link>
-                                    </>
-                                )}
-                            </div>
+            {/* MODAL DE CONFIRMACIÓN DE LOGOUT */}
+            {isLogoutModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    {/* Overlay oscuro */}
+                    <div 
+                        className="absolute inset-0 bg-[#0c4a6f]/20 backdrop-blur-sm"
+                        onClick={() => setIsLogoutModalOpen(false)}
+                    ></div>
+                    
+                    {/* Caja del Modal */}
+                    <div className="relative bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 text-center animate-in fade-in zoom-in duration-200">
+                        <div className="size-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                            <span className="material-symbols-outlined text-3xl">logout</span>
                         </div>
-                        <div className="flex items-center">
-                            {/* Campanita de notificaciones */}
-                            <div className="relative" ref={notificationRef}>
-                                <button
-                                    onClick={() => setShowNotifications(!showNotifications)}
-                                    className="relative p-2 text-white hover:bg-[#0a5a87] rounded-full transition-colors focus:outline-none"
-                                    aria-label="Notificaciones"
-                                >
-                                    <BellIcon className="h-6 w-6" />
-                                    {unreadCount > 0 && (
-                                        <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
-                                            {unreadCount > 99 ? '99+' : unreadCount}
-                                        </span>
-                                    )}
-                                </button>
-
-                                {/* Dropdown de notificaciones */}
-                                {showNotifications && (
-                                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg overflow-hidden z-50 border border-gray-200">
-                                        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                                            <h3 className="text-sm font-medium text-gray-900">Alertas de Handover</h3>
-                                        </div>
-                                        <div className="max-h-96 overflow-y-auto">
-                                            {notifications.length === 0 ? (
-                                                <div className="px-4 py-6 text-center text-gray-500 text-sm">
-                                                    No hay alertas pendientes
-                                                </div>
-                                            ) : (
-                                                notifications.map((notif, index) => (
-                                                    <div
-                                                        key={index}
-                                                        className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 cursor-pointer transition-colors"
-                                                        onClick={() => handleNotificationClick(notif.leadId)}
-                                                    >
-                                                        <div className="flex items-start gap-2">
-                                                            <div className="flex-shrink-0 mt-1">
-                                                                <span className="inline-flex items-center justify-center h-2 w-2 rounded-full bg-red-500"></span>
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-sm font-medium text-gray-900 truncate">
-                                                                    {notif.leadName || 'Lead'} necesita atención
-                                                                </p>
-                                                                <p className="text-xs text-gray-600 mt-1">
-                                                                    {notif.message}
-                                                                </p>
-                                                                <p className="text-xs text-gray-400 mt-1">
-                                                                    {formatTimestamp(notif.timestamp)}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-center">
-                                            <button
-                                                onClick={() => {
-                                                    navigate('/logs');
-                                                    setShowNotifications(false);
-                                                }}
-                                                className="text-sm text-[#064A6F] hover:underline font-medium"
-                                            >
-                                                Ver todas las alertas
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Botón de perfil */}
-                            <div className="relative ml-3" ref={profileRef}>
-                                <button
-                                    onClick={() => setShowProfile(!showProfile)}
-                                    className="flex items-center max-w-xs text-sm text-white hover:bg-[#0a5a87] rounded-full p-1 focus:outline-none transition-colors"
-                                    aria-label="Menú de perfil"
-                                >
-                                    <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center">
-                                        <UserIcon className="h-5 w-5 text-[#064A6F]" />
-                                    </div>
-                                    <span className="ml-2 hidden md:block text-white font-medium mr-2">
-                                        {user?.fullName.split(' ')[0]}
-                                    </span>
-                                </button>
-
-                                {/* Dropdown de perfil */}
-                                {showProfile && (
-                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg overflow-hidden z-50 border border-gray-200">
-                                        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                                            <p className="text-sm font-medium text-gray-900">{user?.fullName || 'Usuario'}</p>
-                                            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                                            <div className="mt-1">
-                                                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${user?.role === 'ADMIN' ? 'bg-[#A7CF3B] text-[#064A6F]' : 'bg-gray-200 text-gray-700'}`}>
-                                                    {user?.role}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="py-1">
-                                            <button
-                                                onClick={() => { navigate('/leads'); setShowProfile(false); }}
-                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                            >
-                                                Mis Leads
-                                            </button>
-                                            {user?.role === 'ADMIN' && (
-                                                <button
-                                                    onClick={() => { navigate('/settings'); setShowProfile(false); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                                >
-                                                    Configuración
-                                                </button>
-                                            )}
-                                            <div className="border-t border-gray-100 my-1"></div>
-                                            <button
-                                                onClick={logout}
-                                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium"
-                                            >
-                                                Cerrar Sesión
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                        
+                        <h3 className="text-xl font-extrabold text-[#111518] mb-2">¿Cerrar sesión ahora?</h3>
+                        <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+                            Tendrás que volver a ingresar tus credenciales para acceder a tu panel de Nettidev.
+                        </p>
+                        
+                        <div className="flex flex-col gap-3">
+                            <button 
+                                onClick={logout}
+                                className="w-full py-3.5 bg-red-500 text-white rounded-2xl font-medium text-sm hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+                            >
+                                Sí, cerrar sesión
+                            </button>
+                            <button 
+                                onClick={() => setIsLogoutModalOpen(false)}
+                                className="w-full py-3.5 bg-gray-50 text-gray-500 rounded-2xl font-medium text-sm hover:bg-gray-100 transition-colors"
+                            >
+                                Cancelar
+                            </button>
                         </div>
                     </div>
                 </div>
-            </nav>
-
-            <div className="py-10">
-                <main>
-                    <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                        <Outlet />
+            )}
+            {/* SIDEBAR IZQUIERDO */}
+            <aside className="w-64 border-r border-gray-200 bg-white fixed h-full z-30">
+                <div className="flex flex-col h-full p-6">
+                    {/* Logo */}
+                    <div className="flex items-center gap-3 mb-10 px-2">
+                        <div className="size-10 bg-[#0c4a6f] rounded-xl flex items-center justify-center text-white shrink-0">
+                                <img
+                                    src="/images/nettidev.svg"
+                                    alt="Logo"
+                                    className="h-10 w-10 object-contain p-1"
+                                />
+                        </div>
+                        <div className="overflow-hidden">
+                            <h1 className="text-[#111518] text-lg font-extrabold leading-none truncate">Nettidev</h1>
+                            <p className="text-gray-400 text-[10px] font-medium uppercase tracking-wider">CRM Dashboard</p>
+                        </div>
                     </div>
-                </main>
-            </div>
+
+                    {/* Navegación */}
+                    <nav className="flex-1 flex flex-col gap-1">
+                        <Link to="/" className={navItemClass('/')}>
+                            <span className="material-symbols-outlined">dashboard</span>
+                            <span className="text-sm font-medium">Dashboard</span>
+                        </Link>
+                        <Link to="/leads" className={navItemClass('/leads')}>
+                            <span className="material-symbols-outlined">groups</span>
+                            <span className="text-sm font-medium">Leads</span>
+                        </Link>
+                        <Link to="/templates" className={navItemClass('/templates')}>
+                            <span className="material-symbols-outlined">description</span>
+                            <span className="text-sm font-medium">Templates</span>
+                        </Link>
+                        <Link to="/quick-replies" className={navItemClass('/quick-replies')}>
+                            <span className="material-symbols-outlined">forum</span>
+                            <span className="text-sm font-medium">Respuestas Rápidas</span>
+                        </Link>
+
+                        {user?.role === 'ADMIN' && (
+                            <>
+                                <div className="mt-6 mb-2 px-4 text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Administración</div>
+                                <Link to="/logs" className={navItemClass('/logs')}>
+                                    <span className="material-symbols-outlined">list_alt</span>
+                                    <span className="text-sm font-medium">Logs</span>
+                                </Link>
+                                <Link to="/users" className={navItemClass('/users')}>
+                                    <span className="material-symbols-outlined">account_circle</span>
+                                    <span className="text-sm font-medium">Usuarios</span>
+                                </Link>
+                                <Link to="/instances" className={navItemClass('/instances')}>
+                                    <span className="material-symbols-outlined">hub</span>
+                                    <span className="text-sm font-medium">Conexiones</span>
+                                </Link>
+                            </>
+                        )}
+                    </nav>
+
+                    {/* Footer Sidebar */}
+                    <div className="mt-auto pt-6 border-t border-gray-100 flex flex-col gap-1">
+                        <Link to="/settings" className={navItemClass('/settings')}>
+                            <span className="material-symbols-outlined">settings</span>
+                            <span className="text-sm font-medium">Configuración</span>
+                        </Link>
+                        <button 
+                            onClick={() => setIsLogoutModalOpen(true)} 
+                            className="flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                            <span className="material-symbols-outlined">logout</span>
+                            <span className="text-sm font-medium">Cerrar Sesión</span>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            {/* CONTENIDO PRINCIPAL */}
+            <main className="flex-1 ml-64 min-h-screen">
+                <header className="h-20 bg-white/80 backdrop-blur-md border-b border-gray-100 px-8 flex items-center justify-between sticky top-0 z-20">
+                    <div className="flex-1 max-w-lg relative">
+                        <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">search</span>
+                        <input 
+                            type="text" 
+                            placeholder="Buscar leads o mensajes..." 
+                            className="w-full bg-gray-50 border-none rounded-2xl pl-12 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-[#0c4a6f]/10 transition-all"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        {/* Notificaciones */}
+                        <div className="relative" ref={notificationRef}>
+                            <button 
+                                onClick={() => setShowNotifications(!showNotifications)}
+                                className="size-10 flex items-center justify-center bg-gray-50 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors relative"
+                            >
+                                <span className="material-symbols-outlined text-[22px]">notifications</span>
+                                {unreadCount > 0 && (
+                                    <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-white"></span>
+                                )}
+                            </button>
+                            {showNotifications && (
+                                <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden py-2">
+                                    <div className="px-4 py-2 font-medium text-xs text-gray-400 uppercase tracking-wider border-b border-gray-50">Alertas Recientes</div>
+                                    <div className="max-h-80 overflow-y-auto">
+                                        {notifications.length > 0 ? notifications.map((n, i) => (
+                                            <div key={i} onClick={() => handleNotificationClick(n.leadId)} className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
+                                                <p className="text-sm font-medium text-gray-800">{n.leadName || 'Lead'}</p>
+                                                <p className="text-xs text-gray-500 truncate">{n.message}</p>
+                                            </div>
+                                        )) : <div className="p-8 text-center text-xs text-gray-400 italic">No hay alertas</div>}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Perfil */}
+                        <div className="relative ml-2" ref={profileRef}>
+                            <button 
+                                onClick={() => setShowProfile(!showProfile)}
+                                className="flex items-center gap-3 p-1.5 pr-4 rounded-2xl hover:bg-gray-50 transition-all border border-transparent hover:border-gray-100"
+                            >
+                                <div className="size-10 bg-[#89c540]/10 text-[#89c540] rounded-xl flex items-center justify-center">
+                                    <span className="material-symbols-outlined">person</span>
+                                </div>
+                                <div className="hidden md:flex flex-col items-start leading-tight">
+                                    <span className="text-sm font-extrabold text-gray-900">{user?.fullName.split(' ')[0]}</span>
+                                    <span className="text-[10px] font-medium text-[#89c540] uppercase">{user?.role}</span>
+                                </div>
+                            </button>
+                            
+                            {showProfile && (
+                                <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden py-2">
+                                    <div className="px-4 py-3 border-b border-gray-50 mb-1">
+                                        <p className="text-sm font-medium truncate">{user?.fullName}</p>
+                                        <p className="text-[10px] text-gray-400 font-medium truncate">{user?.email}</p>
+                                    </div>
+                                    <button onClick={() => navigate('/leads')} className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">Mis Leads</button>
+                                    <button 
+                                        onClick={() => {
+                                            setShowProfile(false);
+                                            setIsLogoutModalOpen(true);
+                                        }} 
+                                        className="w-full text-left px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 flex items-center gap-3 transition-colors"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">logout_variant</span>
+                                        Cerrar Sesión
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </header>
+
+                <div className="p-8 max-w-7xl mx-auto">
+                    <Outlet />
+                </div>
+            </main>
         </div>
     );
 }

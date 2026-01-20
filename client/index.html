@@ -3,8 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/images/nettidev.svg" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Chatbot CRM - UNIOR</title>
+    <style>
+      /* Evita que los iconos se vean como texto ("person", "dashboard") si la fuente tarda en cargar */
+      .material-symbols-outlined {
+        font-variation-settings: 'wght' 300, 'opsz' 24;
+        display: inline-block;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
+        -webkit-font-feature-settings: 'liga';
+        -webkit-font-smoothing: antialiased;
+        /* Esto es clave: si no carga la fuente, el texto será invisible en lugar de verse mal */
+        font-size: 24px; 
+        width: 24px;
+        height: 24px;
+        overflow: hidden;
+      }
+      
+      body { 
+        font-family: 'Manrope', sans-serif !important; 
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
