@@ -1,11 +1,15 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { User, Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private mailService: MailService
+    ) { }
 
     async findOne(email: string): Promise<User | null> {
         return this.prisma.user.findUnique({
@@ -56,7 +60,7 @@ export class UsersService {
         const hashedPassword = await bcrypt.hash(data.password, 10);
 
         // 4. Crear usuario
-        return this.prisma.user.create({
+        const user = await this.prisma.user.create({
             data: {
                 email: data.email,
                 password: hashedPassword,
@@ -65,6 +69,16 @@ export class UsersService {
                 tenant: { connect: { id: tenantId } },
             },
         });
+
+        // 5. Enviar email de bienvenida
+        try {
+            await this.mailService.sendWelcomeEmail(user.email, user.fullName);
+        } catch (error) {
+            // No fallar la creación del usuario si falla el envío del email
+            console.error('[UsersService] Error sending welcome email:', error);
+        }
+
+        return user;
     }
 
     async remove(id: string, tenantId: string): Promise<User> {
@@ -79,6 +93,13 @@ export class UsersService {
 
         return this.prisma.user.delete({
             where: { id },
+        });
+    }
+
+    async updatePassword(email: string, newPassword: string): Promise<void> {
+        await this.prisma.user.update({
+            where: { email },
+            data: { password: newPassword },
         });
     }
 }

@@ -87,6 +87,98 @@
     - [x] Quick Replies (UI & API)
     - [x] AI Response Suggestions (UI & API)
 
+## Phase 11: Email Integration with Resend & React Email
+- [x] Implement Resend Email Service <!-- id: 40 -->
+    - [x] Install Resend SDK in backend (`@nestjs/config`, `resend`)
+    - [x] Configure environment variables (`RESEND_API_KEY`, `FRONTEND_URL`)
+    - [x] Create MailModule (`src/mail/mail.module.ts`)
+    - [x] Implement MailService (`src/mail/mail.service.ts`)
+    - [x] Add password reset email functionality (Spanish)
+    - [x] Add welcome email functionality (sent on user creation)
+    - [x] Add support email functionality
+    - [x] Configure domain verification (`netti.lat`)
+    - [x] Change sender to `no-reply@netti.lat`
+- [x] Implement React Email Templates <!-- id: 41 -->
+    - [x] Install React Email in frontend (`client/`)
+    - [x] Create email templates directory (`client/src/emails/`)
+    - [x] Implement PasswordResetEmail component with professional design
+    - [x] Configure TypeScript for JSX in backend (`tsconfig.json`)
+    - [x] Create render utilities (`client/src/emails/render.ts`, `src/emails/render.ts`)
+- [x] Implement Password Recovery Flow <!-- id: 42 -->
+    - [x] Backend: Add password reset endpoints in AuthController
+    - [x] Backend: Implement JWT token generation for password reset
+    - [x] Backend: Add password update functionality in UsersService
+    - [x] Frontend: Create ForgotPasswordModal component
+    - [x] Frontend: Create ResetPassword page component
+    - [x] Frontend: Add routing for password reset (`/reset-password`)
+    - [x] Frontend: Integrate modal in Login component
+- [x] Email Template Features <!-- id: 43 -->
+    - [x] Professional HTML design with Tailwind CSS
+    - [x] Responsive layout for all devices
+    - [x] Dark mode support
+    - [x] Custom branding (Nettidev colors and logo)
+    - [x] Security information and expiry warnings
+    - [x] Fallback text links for email clients
+    - [x] Company footer with contact information
+
+### Implementation Details
+
+#### Files Created:
+- `src/mail/mail.module.ts` - NestJS module for email services
+- `src/mail/mail.service.ts` - Main email service with Resend integration
+- `src/emails/PasswordResetEmail.tsx` - React Email component for password reset
+- `src/emails/WelcomeEmail.tsx` - React Email component for user welcome
+- `src/emails/render.ts` - Email rendering utilities
+- `src/emails/index.ts` - Email module exports
+- `client/src/emails/PasswordResetEmail.tsx` - Frontend email template (development)
+- `client/src/emails/render.ts` - Frontend rendering utilities
+- `client/src/emails/index.ts` - Frontend email exports
+- `client/src/ForgotPasswordModal.tsx` - Modal for password recovery
+- `client/src/ResetPassword.tsx` - Page for password reset
+
+#### Files Modified:
+- `src/app.module.ts` - Added MailModule import and configuration
+- `src/auth/auth.module.ts` - Added MailModule dependency
+- `src/auth/auth.service.ts` - Added password reset methods
+- `src/auth/auth.controller.ts` - Added password reset endpoints
+- `src/users/users.service.ts` - Added password update method and welcome email on user creation
+- `src/users/users.module.ts` - Added MailModule dependency
+- `client/src/main.tsx` - Added reset password route
+- `client/src/Login.tsx` - Added forgot password modal integration
+- `tsconfig.json` - Added JSX support for React Email
+- `test/app.e2e-spec.ts` - Fixed supertest import issue
+- `.env` - Added FRONTEND_URL and RESEND_API_KEY
+
+#### Libraries Added:
+- Backend: `resend`, `@react-email/components`, `@react-email/render`
+- Frontend: `react-email`
+
+#### Environment Variables:
+- `RESEND_API_KEY=re_7Rg5vKPy_D9b9LufuxwUv3QNze2KPGmxx`
+- `FRONTEND_URL=http://localhost:5173`
+
+#### API Endpoints Added:
+- `POST /auth/request-password-reset` - Request password reset email
+- `POST /auth/reset-password` - Reset password with token
+- `POST /users` - Create user (automatically sends welcome email)
+
+#### Email Features:
+- Professional templates with Nettidev branding (in Spanish)
+- Welcome email sent automatically on user creation
+- Password reset email with secure token handling
+- Responsive design (mobile + desktop)
+- Dark mode support
+- Security warnings and expiry information (1 hour expiration for password reset)
+- Feature highlights in welcome email
+- Fallback links for email clients
+- Company footer with generic contact information
+
+#### Security Features:
+- JWT tokens with 1-hour expiration
+- Secure password hashing with bcrypt
+- Email validation before sending
+- Token verification before password reset
+
 ## Phase 10: Additional Features
 - [ ] Implement Notifications and Alerts <!-- id: 34 -->
     - [ ] Backend: Email notification service (Nodemailer)

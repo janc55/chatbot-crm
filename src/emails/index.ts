@@ -1,0 +1,1 @@
+export { renderPasswordResetEmail, renderWelcomeEmail } from './render';

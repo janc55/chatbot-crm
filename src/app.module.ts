@@ -13,6 +13,7 @@ import { LogsModule } from './logs/logs.module';
 import { ChatModule } from './chat/chat.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
     imports: [
@@ -20,6 +21,7 @@ import { UsersModule } from './users/users.module';
             isGlobal: true,
         }),
         ScheduleModule.forRoot(),
+        MailModule,
         PrismaModule,
         OpenaiModule,
         WhatsappModule,

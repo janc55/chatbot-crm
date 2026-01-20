@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import ForgotPasswordModal from './ForgotPasswordModal';
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
 
@@ -56,7 +58,13 @@ const Login: React.FC = () => {
                     <div>
                         <div className="flex justify-between mb-2 ml-1">
                             <label className="text-sm font-semibold text-gray-700">Contraseña</label>
-                            <button type="button" className="text-xs font-bold text-[#0c4a6f] hover:text-[#08334d]">¿Olvidaste tu contraseña?</button>
+                            <button
+                                type="button"
+                                onClick={() => setShowForgotPassword(true)}
+                                className="text-xs font-bold text-[#0c4a6f] hover:text-[#08334d] hover:underline"
+                            >
+                                ¿Olvidaste tu contraseña?
+                            </button>
                         </div>
                         <div className="relative flex items-center"> {/* Agregado flex e items-center */}
                             <input
@@ -99,15 +107,21 @@ const Login: React.FC = () => {
             <div className="mt-8 flex items-center gap-6 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                 <button className="hover:text-gray-600 transition-colors">Privacidad</button>
                 <button className="hover:text-gray-600 transition-colors">Términos</button>
-                
+
                 {/* Contenedor de idioma */}
-                <div className="flex items-center gap-1.5 cursor-default"> 
+                <div className="flex items-center gap-1.5 cursor-default">
                     <span className="material-symbols-outlined !text-[16px] flex items-center justify-center">
                         language
                     </span>
                     <span className="inline-block">Español (ES)</span>
                 </div>
             </div>
+
+            {/* MODAL DE RECUPERACIÓN DE CONTRASEÑA */}
+            <ForgotPasswordModal
+                isOpen={showForgotPassword}
+                onClose={() => setShowForgotPassword(false)}
+            />
         </div>
     );
 };

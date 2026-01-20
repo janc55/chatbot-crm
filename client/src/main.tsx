@@ -11,6 +11,7 @@ import Logs from './Logs';
 import WhatsAppConnect from './WhatsAppConnect';
 import QuickReplies from './QuickReplies';
 import Login from './Login';
+import ResetPassword from './ResetPassword';
 import Users from './Users';
 import { ChatProvider } from './context/ChatContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -37,6 +38,7 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       <Route path="/" element={
         <ProtectedRoute>
