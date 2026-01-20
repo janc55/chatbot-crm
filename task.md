@@ -154,7 +154,7 @@
 - Frontend: `react-email`
 
 #### Environment Variables:
-- `RESEND_API_KEY=re_7Rg5vKPy_D9b9LufuxwUv3QNze2KPGmxx`
+- `RESEND_API_KEY=your_resend_api_key_here`
 - `FRONTEND_URL=http://localhost:5173`
 
 #### API Endpoints Added:
