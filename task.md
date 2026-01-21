@@ -179,6 +179,22 @@
 - Email validation before sending
 - Token verification before password reset
 
+
+## Phase 12: Follow-up Scheduler Bug Fix
+- [x] Investigate follow-up scheduler bug <! id: 44 -->
+  - Root cause: `findStaleLeads()` was checking `lead.updatedAt` instead of last interaction time
+  - Issue: `updatedAt` changes on ANY field modification, not just new messages
+  - Result: Leads qualified for follow-up every hour regardless of `followUpHours` setting
+- [x] Fix `findStaleLeads()` method in LeadsService <! id: 45 -->
+  - Changed query to check last interaction timestamp
+  - Added filter to exclude leads with active handover (human agents)
+  - Handle leads with no interactions (check creation date)
+- [x] Create unit tests for fixed method <! id: 46 -->
+  - Test stale lead detection based on interaction time
+  - Test handover exclusion
+  - Test leads with no interactions
+  - All tests passing ✅
+
 ## Phase 10: Additional Features
 - [ ] Implement Notifications and Alerts <!-- id: 34 -->
     - [ ] Backend: Email notification service (Nodemailer)

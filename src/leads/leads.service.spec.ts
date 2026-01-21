@@ -3,18 +3,13 @@ import { LeadsService } from './leads.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { LeadStatus } from '@prisma/client';
 
-describe('LeadsService', () => {
+describe('LeadsService - findStaleLeads', () => {
     let service: LeadsService;
-    let prisma: PrismaService;
+    let prismaService: PrismaService;
 
-    const mockPrisma = {
+    const mockPrismaService = {
         lead: {
-            findUnique: jest.fn(),
-            create: jest.fn(),
-            update: jest.fn(),
             findMany: jest.fn(),
-            count: jest.fn(),
-            groupBy: jest.fn(),
         },
     };
 
@@ -22,69 +17,125 @@ describe('LeadsService', () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 LeadsService,
-                { provide: PrismaService, useValue: mockPrisma },
+                {
+                    provide: PrismaService,
+                    useValue: mockPrismaService,
+                },
             ],
         }).compile();
 
         service = module.get<LeadsService>(LeadsService);
-        prisma = module.get<PrismaService>(PrismaService);
+        prismaService = module.get<PrismaService>(PrismaService);
     });
 
-    it('should be defined', () => {
-        expect(service).toBeDefined();
+    afterEach(() => {
+        jest.clearAllMocks();
     });
 
-    describe('findOrCreate', () => {
-        it('should return existing lead', async () => {
-            const lead = { id: '1', phone: '123' };
-            mockPrisma.lead.findUnique.mockResolvedValue(lead);
+    it('should return leads with last interaction older than specified hours', async () => {
+        const now = new Date();
+        const twentyFiveHoursAgo = new Date(now.getTime() - 25 * 60 * 60 * 1000);
+        const oneHourAgo = new Date(now.getTime() - 1 * 60 * 60 * 1000);
 
-            const result = await service.findOrCreate('123', 'tenant-1');
-            expect(result).toEqual(lead);
-            expect(mockPrisma.lead.create).not.toHaveBeenCalled();
-        });
+        const mockLeads = [
+            {
+                id: '1',
+                phone: '59178123456',
+                status: LeadStatus.INTERESADO_BROCHURE,
+                isHandoverActive: false,
+                createdAt: twentyFiveHoursAgo,
+                interactions: [
+                    {
+                        id: 'int1',
+                        createdAt: twentyFiveHoursAgo,
+                        content: 'Old message',
+                    },
+                ],
+            },
+            {
+                id: '2',
+                phone: '59178234567',
+                status: LeadStatus.INTERESADO_COSTOS,
+                isHandoverActive: false,
+                createdAt: oneHourAgo,
+                interactions: [
+                    {
+                        id: 'int2',
+                        createdAt: oneHourAgo,
+                        content: 'Recent message',
+                    },
+                ],
+            },
+        ];
 
-        it('should create new lead if not found', async () => {
-            const lead = { id: '1', phone: '123', tenantId: 'tenant-1', status: LeadStatus.NUEVO };
-            mockPrisma.lead.findUnique.mockResolvedValue(null);
-            mockPrisma.lead.create.mockResolvedValue(lead);
+        mockPrismaService.lead.findMany.mockResolvedValue(mockLeads);
 
-            const result = await service.findOrCreate('123', 'tenant-1', 'John');
-            expect(result).toEqual(lead);
-            expect(mockPrisma.lead.create).toHaveBeenCalledWith({
-                data: { phone: '123', tenantId: 'tenant-1', fullName: 'John', status: LeadStatus.NUEVO },
-            });
-        });
+        const result = await service.findStaleLeads(24);
+
+        // Should return only the lead with interaction > 24 hours old
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('1');
+        expect(result[0]).not.toHaveProperty('interactions');
     });
 
-    describe('getStats', () => {
-        it('should return statistics including career interest', async () => {
-            mockPrisma.lead.count.mockResolvedValue(10);
-            mockPrisma.lead.groupBy
-                .mockResolvedValueOnce([{ status: 'NUEVO', _count: { status: 5 } }]) // byStatus
-                .mockResolvedValueOnce([{ careerInterest: 'MEDICINA', _count: { careerInterest: 3 } }]); // byCareer
+    it('should exclude leads with active handover', async () => {
+        const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000);
 
-            const result = await service.getStats();
+        mockPrismaService.lead.findMany.mockResolvedValue([]);
 
-            expect(result.total).toBe(10);
-            expect(result.byStatus).toBeDefined();
-            expect(result.byCareer).toBeDefined();
-            expect(mockPrisma.lead.groupBy).toHaveBeenCalledTimes(2);
-        });
+        await service.findStaleLeads(24);
+
+        expect(mockPrismaService.lead.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    isHandoverActive: false,
+                }),
+            }),
+        );
     });
 
-    describe('toggleHandover', () => {
-        it('should update isHandoverActive', async () => {
-            const id = '123';
-            const status = true;
-            mockPrisma.lead.update.mockResolvedValue({ id, isHandoverActive: status });
+    it('should include leads with no interactions if created before cutoff', async () => {
+        const now = new Date();
+        const twentyFiveHoursAgo = new Date(now.getTime() - 25 * 60 * 60 * 1000);
 
-            await service.toggleHandover(id, status);
+        const mockLeads = [
+            {
+                id: '1',
+                phone: '59178123456',
+                status: LeadStatus.INTERESADO_BROCHURE,
+                isHandoverActive: false,
+                createdAt: twentyFiveHoursAgo,
+                interactions: [], // No interactions
+            },
+        ];
 
-            expect(mockPrisma.lead.update).toHaveBeenCalledWith({
-                where: { id },
-                data: { isHandoverActive: status },
-            });
-        });
+        mockPrismaService.lead.findMany.mockResolvedValue(mockLeads);
+
+        const result = await service.findStaleLeads(24);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('1');
+    });
+
+    it('should exclude leads with no interactions if created after cutoff', async () => {
+        const now = new Date();
+        const oneHourAgo = new Date(now.getTime() - 1 * 60 * 60 * 1000);
+
+        const mockLeads = [
+            {
+                id: '1',
+                phone: '59178123456',
+                status: LeadStatus.INTERESADO_BROCHURE,
+                isHandoverActive: false,
+                createdAt: oneHourAgo,
+                interactions: [], // No interactions
+            },
+        ];
+
+        mockPrismaService.lead.findMany.mockResolvedValue(mockLeads);
+
+        const result = await service.findStaleLeads(24);
+
+        expect(result).toHaveLength(0);
     });
 });

@@ -50,16 +50,38 @@ export class LeadsService {
         const cutoff = new Date();
         cutoff.setHours(cutoff.getHours() - hours);
 
-        return this.prisma.lead.findMany({
+        // Find leads where the most recent interaction is older than the cutoff time
+        // and exclude leads with active handover (human agent is handling them)
+        const leadsWithLastInteraction = await this.prisma.lead.findMany({
             where: {
                 status: {
                     in: [LeadStatus.INTERESADO_BROCHURE, LeadStatus.INTERESADO_COSTOS],
                 },
-                updatedAt: {
-                    lt: cutoff,
+                isHandoverActive: false, // Don't send automated follow-ups when human agent is involved
+            },
+            include: {
+                interactions: {
+                    orderBy: {
+                        createdAt: 'desc',
+                    },
+                    take: 1, // Get only the most recent interaction
                 },
             },
         });
+
+        // Filter leads where the last interaction is older than cutoff
+        const staleLeads = leadsWithLastInteraction.filter(lead => {
+            if (lead.interactions.length === 0) {
+                // No interactions yet - check if lead was created before cutoff
+                return lead.createdAt < cutoff;
+            }
+
+            const lastInteraction = lead.interactions[0];
+            return lastInteraction.createdAt < cutoff;
+        });
+
+        // Return leads without the interactions to match the original return type
+        return staleLeads.map(({ interactions, ...lead }) => lead);
     }
 
     async getStats() {
