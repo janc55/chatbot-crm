@@ -27,8 +27,8 @@ export default function Dashboard() {
     };
 
     useEffect(() => {
-        api.get('/leads/stats').then(res => setStats(res.data));
-        api.get('/leads/stats/history').then(res => setHistory(res.data));
+        api.get('/persons/stats').then(res => setStats(res.data));
+        api.get('/persons/stats/history').then(res => setHistory(res.data));
         // Recupere estado de bot (GET /webhook/whatsapp/status)
         // Nota: Si el bot no está conectado, devuelve null o status disconnected
         api.get('/webhook/whatsapp/status')

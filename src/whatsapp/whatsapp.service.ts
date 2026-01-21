@@ -1,13 +1,13 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { BaileysService } from './baileys.service';
-import { LeadsService } from '../leads/leads.service';
+import { PersonsService } from '../persons/persons.service';
 import { InteractionsService } from '../interactions/interactions.service';
 import { TemplatesService } from '../templates/templates.service';
 import { OpenaiService } from '../openai/openai.service';
 import { LogsService } from '../logs/logs.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { SettingsService } from '../settings/settings.service';
-import { LeadStatus, Direction, MessageType } from '@prisma/client';
+import { Person, LeadStatus, Direction, MessageType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -17,7 +17,7 @@ export class WhatsappService {
     private readonly logger = new Logger(WhatsappService.name);
 
     private processedMessages = new Set<string>();
-    private handoverTimeouts = new Map<string, NodeJS.Timeout>(); // leadId -> timeout
+    private handoverTimeouts = new Map<string, NodeJS.Timeout>(); // personId -> timeout
     private messageBuffers = new Map<string, {
         messages: { text: string, messageId: string }[],
         timeout: NodeJS.Timeout,
@@ -30,7 +30,7 @@ export class WhatsappService {
     constructor(
         @Inject(forwardRef(() => BaileysService))
         private baileysService: BaileysService,
-        private leadsService: LeadsService,
+        private personsService: PersonsService,
         private interactionsService: InteractionsService,
         private templatesService: TemplatesService,
         private openaiService: OpenaiService,
@@ -79,27 +79,27 @@ export class WhatsappService {
 
     // --- MESSAGE PROCESSING ---
 
-    async sendFollowUp(lead: any, template: any) {
-        if (!lead.tenantId) {
-            this.logger.warn(`Cannot send follow up to lead ${lead.id} without tenantId`);
+    async sendFollowUp(person: any, template: any) {
+        if (!person.tenantId) {
+            this.logger.warn(`Cannot send follow up to person ${person.id} without tenantId`);
             return;
         }
 
         const instance = await this.prisma.whatsappInstance.findFirst({
-            where: { tenantId: lead.tenantId, status: 'CONNECTED' }
+            where: { tenantId: person.tenantId, status: 'CONNECTED' }
         });
 
         if (!instance) {
-            this.logger.warn(`No connected instance found for tenant ${lead.tenantId}`);
+            this.logger.warn(`No connected instance found for tenant ${person.tenantId}`);
             return;
         }
 
-        const remoteJid = lead.phone.includes('@') ? lead.phone : `${lead.phone}@s.whatsapp.net`;
+        const remoteJid = person.phone.includes('@') ? person.phone : `${person.phone}@s.whatsapp.net`;
         await this.sendResponse(remoteJid, {
             text: template.content,
             templateKey: template.key,
             attachments: template.attachments ? JSON.parse(template.attachments) : null
-        }, lead, instance.id);
+        }, person, instance.id);
     }
 
     async processMessage(data: { remoteJid: string; phoneNumber?: string; text: string; name?: string; messageId: string, tenantId: string, instanceId: string }) {
@@ -149,8 +149,6 @@ export class WhatsappService {
         if (!buffer) return;
 
         this.messageBuffers.delete(bufferKey);
-        // bufferKey format is: ${instanceId}:${remoteJid}
-        // remoteJid can contain : in rare cases, so split on first occurrence only
         const firstColonIndex = bufferKey.indexOf(':');
         const remoteJid = bufferKey.substring(firstColonIndex + 1);
 
@@ -172,17 +170,16 @@ export class WhatsappService {
 
         if (!phoneToSave || phoneToSave.length < 5) return;
 
-        console.log(`[WhatsappService] phoneToSave: ${phoneToSave}, phoneNumberFromData: ${phoneNumberFromData}, remoteJid: ${remoteJid}`);
-        const lead = await this.leadsService.findOrCreate(phoneToSave, tenantId, name);
+        const person = await this.personsService.findOrCreate(phoneToSave, tenantId, name);
 
         await this.interactionsService.logInteraction({
-            leadId: lead.id,
+            personId: person.id,
             direction: Direction.INBOUND,
             messageType: MessageType.TEXT,
             content: combinedText,
         });
 
-        this.chatGateway.emitMessageToRoom(lead.id, {
+        this.chatGateway.emitMessageToRoom(person.id, {
             direction: 'INBOUND',
             content: combinedText,
             createdAt: new Date(),
@@ -190,16 +187,16 @@ export class WhatsappService {
             instanceId
         });
 
-        if (lead.isHandoverActive) {
-            this.logsService.addLog('log', `Message received from ${lead.phone} while Handover is ACTIVE. Bot is silent.`, 'WhatsappService');
+        if (person.isHandoverActive) {
+            this.logsService.addLog('log', `Message received from ${person.phone} while Handover is ACTIVE. Bot is silent.`, 'WhatsappService');
             return;
         }
 
-        const responses = await this.handleIntents(combinedText, lead);
+        const responses = await this.handleIntents(combinedText, person);
 
         if (responses && responses.length > 0) {
             for (const response of responses) {
-                await this.sendResponse(remoteJid, response, lead, instanceId);
+                await this.sendResponse(remoteJid, response, person, instanceId);
                 if (responses.length > 1) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
@@ -209,7 +206,7 @@ export class WhatsappService {
         }
     }
 
-    private async handleIntents(text: string, lead: any): Promise<{ text: string; templateKey?: string; attachments?: any, statusUpdate?: LeadStatus }[]> {
+    private async handleIntents(text: string, person: any): Promise<{ text: string; templateKey?: string; attachments?: any, statusUpdate?: LeadStatus }[]> {
         const lowerText = text.toLowerCase();
         const responses: { text: string; templateKey?: string; attachments?: any, statusUpdate?: LeadStatus }[] = [];
 
@@ -220,40 +217,38 @@ export class WhatsappService {
         }
 
         if (lowerText.includes('medicina')) {
-            await this.leadsService.updateInterest(lead.id, 'MEDICINA');
+            await this.personsService.updateInterest(person.id, 'MEDICINA');
             const t = await this.templatesService.findByKey('brochure_medicina');
             if (t) responses.push({ text: t.content, templateKey: t.key, attachments: t.attachments ? JSON.parse(t.attachments) : null, statusUpdate: LeadStatus.INTERESADO_BROCHURE });
         }
 
         if (lowerText.includes('derecho') || lowerText.includes('abogado') || lowerText.includes('leyes')) {
-            await this.leadsService.updateInterest(lead.id, 'DERECHO');
+            await this.personsService.updateInterest(person.id, 'DERECHO');
             const t = await this.templatesService.findByKey('brochure_derecho');
             if (t) responses.push({ text: t.content, templateKey: t.key, attachments: t.attachments ? JSON.parse(t.attachments) : null, statusUpdate: LeadStatus.INTERESADO_BROCHURE });
         }
 
         // --- OPENAI FALLBACK ---
         let searchContext = text;
-        if (lead.careerInterest) searchContext += ` ${lead.careerInterest}`;
+        if (person.careerInterest) searchContext += ` ${person.careerInterest}`;
 
         const topTemplates = await this.templatesService.findMostRelevant(searchContext, 5);
         let context = topTemplates.length > 0
             ? topTemplates.map(t => `- KEY: ${t.key} (Cat: ${t.category}): ${(t.content || '').substring(0, 150)}...`).join('\n')
             : await this.templatesService.getContextSummary();
 
-        const lastMessages = await this.leadsService.getLastMessages(lead.id, 6);
+        const lastMessages = await this.personsService.getLastMessages(person.id, 6);
         const historyText = lastMessages.reverse().map(m => `${m.direction === 'INBOUND' ? 'Usuario' : 'Bot'}: ${m.content}`).join('\n');
 
         const classification = await this.openaiService.classifyMessage(text, context, historyText);
 
         if (classification.needs_human) {
-            await this.leadsService.toggleHandover(lead.id, true);
-            await this.leadsService.updateStatus(lead.id, LeadStatus.NECESITA_ASESOR); // switched to ID
-            this.logsService.addHandoverAlert(lead.id, lead.phone, lead.fullName, `Asistencia humana: "${text.substring(0, 100)}"`);
+            await this.personsService.toggleHandover(person.id, true);
+            await this.personsService.updateStatus(person.id, LeadStatus.NECESITA_ASESOR);
+            this.logsService.addHandoverAlert(person.id, person.phone, person.fullName, `Asistencia humana: "${text.substring(0, 100)}"`);
 
-            const remoteJidForTimeout = lead.phone.includes('@') ? lead.phone : `${lead.phone}@s.whatsapp.net`;
-            this.scheduleHandoverTimeout(lead.id, remoteJidForTimeout); // Needs to handle multi-instance? Logic calls sendResponse, so we need instance to reply.
-            // But Schedule creates a timeout. When it fires, we need an instance.
-            // We'll solve that in `scheduleHandoverTimeout`.
+            const remoteJidForTimeout = person.phone.includes('@') ? person.phone : `${person.phone}@s.whatsapp.net`;
+            this.scheduleHandoverTimeout(person.id, remoteJidForTimeout);
 
             const t = await this.templatesService.findByKey('necesita_asesor');
             responses.push(t ? { text: t.content, templateKey: t.key } : { text: "Un asesor te contactará.", templateKey: 'fallback' });
@@ -282,9 +277,7 @@ export class WhatsappService {
         return responses;
     }
 
-    private async sendResponse(remoteJid: string, response: any, lead: any, instanceId: string) {
-        this.logger.log(`[DEBUG] sendResponse called for ${remoteJid} on instance ${instanceId}`);
-
+    private async sendResponse(remoteJid: string, response: any, person: any, instanceId: string) {
         if (response.attachments && response.attachments.length > 0) {
             const attachmentPath = response.attachments[0];
             const isUrl = attachmentPath.startsWith('http');
@@ -312,84 +305,78 @@ export class WhatsappService {
             }
 
             await this.interactionsService.logInteraction({
-                leadId: lead.id,
+                personId: person.id,
                 direction: Direction.OUTBOUND,
                 messageType: MessageType.MEDIA,
                 content: response.text,
                 templateKey: response.templateKey,
-                usedAi: response.templateKey ? false : true
+                usedAi: !!(response.templateKey)
             });
         } else {
-            // Send Text
             await this.baileysService.sendMessage(instanceId, remoteJid, { text: response.text });
             await this.interactionsService.logInteraction({
-                leadId: lead.id,
+                personId: person.id,
                 direction: Direction.OUTBOUND,
                 messageType: MessageType.TEXT,
                 content: response.text,
                 templateKey: response.templateKey,
-                usedAi: response.templateKey ? false : true
+                usedAi: !!(response.templateKey)
             });
         }
 
         if (response.statusUpdate) {
-            await this.leadsService.updateStatus(lead.id, response.statusUpdate);
+            await this.personsService.updateStatus(person.id, response.statusUpdate);
         }
     }
 
-    private scheduleHandoverTimeout(leadId: string, remoteJid: string) {
-        this.cancelHandoverTimeout(leadId);
+    private scheduleHandoverTimeout(personId: string, remoteJid: string) {
+        this.cancelHandoverTimeout(personId);
 
         const timeout = setTimeout(async () => {
             try {
-                // Determine tenant and instance
-                // We need to fetch lead to get tenantId
-                const lead = await this.leadsService.findById(leadId);
-                if (lead && lead.isHandoverActive) {
-                    await this.leadsService.toggleHandover(leadId, false);
+                const person = await this.personsService.findById(personId);
+                if (person && person.isHandoverActive) {
+                    await this.personsService.toggleHandover(personId, false);
 
                     const followUpTemplate = await this.templatesService.findByKey('follow_up_no_response');
                     const message = followUpTemplate
                         ? followUpTemplate.content
-                        : "Hola! ¿Sigues interesado en información sobre nuestras carreras? Un asesor estará disponible pronto.";
+                        : "Hola! ¿Sigues interesado en información? Un asesor estará disponible pronto.";
 
-                    // Finding instance to reply
-                    if (lead.tenantId) {
+                    if (person.tenantId) {
                         const instance = await this.prisma.whatsappInstance.findFirst({
-                            where: { tenantId: lead.tenantId, status: 'CONNECTED' }
+                            where: { tenantId: person.tenantId, status: 'CONNECTED' }
                         });
                         if (instance) {
-                            await this.sendResponse(remoteJid, { text: message, templateKey: 'follow_up' }, lead, instance.id);
+                            await this.sendResponse(remoteJid, { text: message, templateKey: 'follow_up' }, person, instance.id);
                         }
                     }
 
-                    this.logsService.addLog('log', `Handover timeout reached for lead ${lead.phone}, bot reactivated`, 'WhatsappService');
+                    this.logsService.addLog('log', `Handover timeout reached for person ${person.phone}, bot reactivated`, 'WhatsappService');
                 }
             } catch (error) {
-                this.logger.error(`Error in handover timeout for lead ${leadId}:`, error);
+                this.logger.error(`Error in handover timeout for person ${personId}:`, error);
             } finally {
-                this.handoverTimeouts.delete(leadId);
+                this.handoverTimeouts.delete(personId);
             }
         }, 30 * 60 * 1000);
 
-        this.handoverTimeouts.set(leadId, timeout);
-        this.logger.log(`Handover timeout scheduled for lead ${leadId} in 30 minutes`);
+        this.handoverTimeouts.set(personId, timeout);
     }
 
-    private cancelHandoverTimeout(leadId: string) {
-        const timeout = this.handoverTimeouts.get(leadId);
+    private cancelHandoverTimeout(personId: string) {
+        const timeout = this.handoverTimeouts.get(personId);
         if (timeout) {
             clearTimeout(timeout);
-            this.handoverTimeouts.delete(leadId);
-            this.logger.log(`Handover timeout cancelled for lead ${leadId}`);
+            this.handoverTimeouts.delete(personId);
         }
     }
 
-    async sendAdvisorMessage(remoteJid: string, message: string, lead: any, instanceId?: string) {
+    async sendAdvisorMessage(remoteJid: string, message: string, person: any, instanceId?: string) {
         let targetInstanceId = instanceId;
         if (!targetInstanceId) {
             const instance = await this.prisma.whatsappInstance.findFirst({
-                where: { tenantId: lead.tenantId, status: 'CONNECTED' }
+                where: { tenantId: person.tenantId, status: 'CONNECTED' }
             });
             targetInstanceId = instance?.id;
         }
@@ -399,6 +386,6 @@ export class WhatsappService {
         return this.sendResponse(remoteJid, {
             text: message,
             templateKey: 'advisor_message'
-        }, lead, targetInstanceId);
+        }, person, targetInstanceId);
     }
 }

@@ -12,8 +12,8 @@ interface Message {
 interface ChatContextType {
     socket: Socket | null;
     messages: Message[];
-    currentLeadId: string | null;
-    joinRoom: (leadId: string) => void;
+    currentPersonId: string | null;
+    joinRoom: (personId: string) => void;
     leaveRoom: () => void;
     sendMessage: (message: string) => Promise<void>;
 }
@@ -23,7 +23,7 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [socket, setSocket] = useState<Socket | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
-    const [currentLeadId, setCurrentLeadId] = useState<string | null>(null);
+    const [currentPersonId, setCurrentPersonId] = useState<string | null>(null);
 
     useEffect(() => {
         // Connect to WebSocket server
@@ -51,26 +51,26 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
     }, []);
 
-    const joinRoom = (leadId: string) => {
+    const joinRoom = (personId: string) => {
         if (socket) {
-            socket.emit('join_room', leadId);
-            setCurrentLeadId(leadId);
+            socket.emit('join_room', personId);
+            setCurrentPersonId(personId);
             setMessages([]); // Clear messages when switching rooms
         }
     };
 
     const leaveRoom = () => {
-        if (socket && currentLeadId) {
-            socket.emit('leave_room', currentLeadId);
-            setCurrentLeadId(null);
+        if (socket && currentPersonId) {
+            socket.emit('leave_room', currentPersonId);
+            setCurrentPersonId(null);
             setMessages([]);
         }
     };
 
     const sendMessage = async (message: string) => {
-        if (!currentLeadId) return;
+        if (!currentPersonId) return;
 
-        console.log('sendMessage called with message:', message, 'leadId:', currentLeadId);
+        console.log('sendMessage called with message:', message, 'personId:', currentPersonId);
         try {
             const response = await fetch('http://localhost:3000/chat/send', {
                 method: 'POST',
@@ -78,7 +78,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    leadId: currentLeadId,
+                    personId: currentPersonId,
                     message,
                 }),
             });
@@ -95,7 +95,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <ChatContext.Provider value={{ socket, messages, currentLeadId, joinRoom, leaveRoom, sendMessage }}>
+        <ChatContext.Provider value={{ socket, messages, currentPersonId, joinRoom, leaveRoom, sendMessage }}>
             {children}
         </ChatContext.Provider>
     );

@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Param, Delete, Put } from '@nestjs/common'
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ChatService } from './chat.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
-import { LeadsService } from '../leads/leads.service';
+import { PersonsService } from '../persons/persons.service';
 import { OpenaiService } from '../openai/openai.service';
 import { ChatGateway } from './chat.gateway';
 
@@ -12,51 +12,51 @@ export class ChatController {
     constructor(
         private chatService: ChatService,
         private whatsappService: WhatsappService,
-        private leadsService: LeadsService,
+        private personsService: PersonsService,
         private openaiService: OpenaiService,
         private chatGateway: ChatGateway,
     ) { }
 
-    @Get('history/:leadId')
-    @ApiOperation({ summary: 'Get conversation history for a lead' })
-    async getHistory(@Param('leadId') leadId: string) {
-        return this.chatService.getConversationHistory(leadId);
+    @Get('history/:personId')
+    @ApiOperation({ summary: 'Get conversation history for a person' })
+    async getHistory(@Param('personId') personId: string) {
+        return this.chatService.getConversationHistory(personId);
     }
 
     @Post('send')
-    @ApiOperation({ summary: 'Send message to a lead via WhatsApp' })
-    async sendMessage(@Body() body: { leadId: string; message: string }) {
-        const { leadId, message } = body;
+    @ApiOperation({ summary: 'Send message to a person via WhatsApp' })
+    async sendMessage(@Body() body: { personId: string; message: string }) {
+        const { personId, message } = body;
 
-        console.log('Backend: Sending message to lead:', leadId, 'message:', message);
+        console.log('Backend: Sending message to person:', personId, 'message:', message);
 
-        // Get lead info
-        const lead = await this.leadsService.findById(leadId);
-        if (!lead) {
-            console.log('Backend: Lead not found');
-            throw new Error('Lead not found');
+        // Get person info
+        const person = await this.personsService.findById(personId);
+        if (!person) {
+            console.log('Backend: Person not found');
+            throw new Error('Person not found');
         }
 
-        console.log('Backend: Lead found:', lead.phone);
+        console.log('Backend: Person found:', person.phone);
 
         // Build remoteJid
-        const remoteJid = lead.phone.includes('@') ? lead.phone : `${lead.phone}@s.whatsapp.net`;
+        const remoteJid = person.phone.includes('@') ? person.phone : `${person.phone}@s.whatsapp.net`;
 
         console.log('Backend: RemoteJid:', remoteJid);
 
         // Send via WhatsApp
-        await this.whatsappService.sendAdvisorMessage(remoteJid, message, lead);
+        await this.whatsappService.sendAdvisorMessage(remoteJid, message, person);
 
         console.log('Backend: Message sent via WhatsApp');
 
         // Cancel handover timeout if active
-        if (lead.isHandoverActive) {
-            await this.leadsService.toggleHandover(leadId, false);
+        if (person.isHandoverActive) {
+            await this.personsService.toggleHandover(personId, false);
             console.log('Backend: Handover cancelled');
         }
 
         // Emit to WebSocket clients
-        this.chatGateway.emitMessageToRoom(leadId, {
+        this.chatGateway.emitMessageToRoom(personId, {
             direction: 'OUTBOUND',
             content: message,
             createdAt: new Date(),
@@ -95,12 +95,12 @@ export class ChatController {
         return this.chatService.deleteQuickReply(id);
     }
 
-    @Get('suggest/:leadId')
-    @ApiOperation({ summary: 'Get AI-powered response suggestions for a lead' })
-    async getSuggestions(@Param('leadId') leadId: string) {
+    @Get('suggest/:personId')
+    @ApiOperation({ summary: 'Get AI-powered response suggestions for a person' })
+    async getSuggestions(@Param('personId') personId: string) {
         // Get conversation history
-        const history = await this.chatService.getConversationHistory(leadId);
-        const lead = await this.leadsService.findById(leadId);
+        const history = await this.chatService.getConversationHistory(personId);
+        const person = await this.personsService.findById(personId);
 
         if (!history || history.length === 0) {
             return {
@@ -133,7 +133,7 @@ export class ChatController {
         }
 
         // Use OpenAI to generate suggestions with conversation context
-        const careerContext = lead.careerInterest ? `El estudiante está interesado en ${lead.careerInterest}.` : 'No hay carrera específica de interés.';
+        const careerContext = person.careerInterest ? `El estudiante está interesado en ${person.careerInterest}.` : 'No hay carrera específica de interés.';
 
         try {
             const response = await this.openaiService.generateSuggestions(

@@ -1,17 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { LeadsService } from '../leads/leads.service';
+import { PersonsService } from '../persons/persons.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { TemplatesService } from '../templates/templates.service';
 import { SettingsService } from '../settings/settings.service';
-import { LeadStatus } from '@prisma/client';
 
 @Injectable()
 export class TasksService {
     private readonly logger = new Logger(TasksService.name);
 
     constructor(
-        private leadsService: LeadsService,
+        private personsService: PersonsService,
         private whatsappService: WhatsappService,
         private templatesService: TemplatesService,
         private settingsService: SettingsService,
@@ -19,33 +18,40 @@ export class TasksService {
 
     @Cron(CronExpression.EVERY_HOUR)
     async handleFollowUps() {
-        // 0. Check if follow-up is enabled
-        const settings = await this.settingsService.getChatbotSettings();
-        if (!settings.followUpEnabled) {
-            return;
-        }
+        const tenants = await this.settingsService.getAllTenants();
 
-        this.logger.log(`Starting follow-up check (Inactivity threshold: ${settings.followUpHours}h)...`);
+        for (const tenant of tenants) {
+            try {
+                // 0. Check if follow-up is enabled for this tenant
+                const settings = await this.settingsService.getChatbotSettings(tenant.id);
+                if (!settings.followUpEnabled) {
+                    continue;
+                }
 
-        // Find leads without interaction for > settings.followUpHours
-        const leads = await this.leadsService.findStaleLeads(settings.followUpHours);
+                this.logger.log(`[Tenant: ${tenant.name}] Starting follow-up check (Inactivity threshold: ${settings.followUpHours}h)...`);
 
-        if (leads.length === 0) {
-            this.logger.log('No stale leads found.');
-            return;
-        }
+                // Find persons without interaction for > settings.followUpHours
+                const persons = await this.personsService.findStaleLeads(tenant.id, settings.followUpHours);
 
-        this.logger.log(`Found ${leads.length} stale leads. Sending follow-ups...`);
+                if (persons.length === 0) {
+                    continue;
+                }
 
-        const template = await this.templatesService.findByKey('seguimiento');
-        if (!template) {
-            this.logger.warn('Follow-up template "seguimiento" not found.');
-            return;
-        }
+                this.logger.log(`[Tenant: ${tenant.name}] Found ${persons.length} stale persons. Sending follow-ups...`);
 
-        for (const lead of leads) {
-            this.logger.log(`Sending follow-up to ${lead.phone}`);
-            await this.whatsappService.sendFollowUp(lead, template);
+                const template = await this.templatesService.findByKey('seguimiento', tenant.id);
+                if (!template) {
+                    this.logger.warn(`[Tenant: ${tenant.name}] Follow-up template "seguimiento" not found.`);
+                    continue;
+                }
+
+                for (const person of persons) {
+                    this.logger.log(`[Tenant: ${tenant.name}] Sending follow-up to ${person.phone}`);
+                    await this.whatsappService.sendFollowUp(person, template);
+                }
+            } catch (error) {
+                this.logger.error(`Error processing follow-ups for tenant ${tenant.id}: ${error.message}`);
+            }
         }
     }
 }

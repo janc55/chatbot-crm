@@ -6,9 +6,9 @@ import { Injectable } from '@nestjs/common';
 export class ChatService {
     constructor(private prisma: PrismaService) { }
 
-    async getConversationHistory(leadId: string) {
+    async getConversationHistory(personId: string) {
         return this.prisma.interaction.findMany({
-            where: { leadId },
+            where: { personId },
             orderBy: { createdAt: 'asc' },
             select: {
                 id: true,
@@ -28,69 +28,69 @@ export class ChatService {
     }
 
     async createQuickReply(data: { title: string; content: string; category?: string }) {
-    const normalizedTitle = toCommandSlug(data.title);
+        const normalizedTitle = toCommandSlug(data.title);
 
-    // Verificamos si ya existe uno con ese mismo slug (para evitar duplicados)
-    const existing = await this.prisma.quickReply.findFirst({
-        where: { title: normalizedTitle },
-    });
+        // Verificamos si ya existe uno con ese mismo slug (para evitar duplicados)
+        const existing = await this.prisma.quickReply.findFirst({
+            where: { title: normalizedTitle },
+        });
 
-    if (existing) {
-        throw new Error(
-        `Ya existe una respuesta rápida con el comando "/${normalizedTitle}". Elige otro título.`
-        );
-        // O usa BadRequestException si tienes excepciones de NestJS
-        // throw new BadRequestException(`El comando /${normalizedTitle} ya está en uso`);
-    }
+        if (existing) {
+            throw new Error(
+                `Ya existe una respuesta rápida con el comando "/${normalizedTitle}". Elige otro título.`
+            );
+            // O usa BadRequestException si tienes excepciones de NestJS
+            // throw new BadRequestException(`El comando /${normalizedTitle} ya está en uso`);
+        }
 
-    return this.prisma.quickReply.create({
-        data: {
-        title: normalizedTitle,           // ← ¡Aquí se guarda el valor convertido!
-        content: data.content,
-        category: data.category || 'general',
-        },
-    });
-    }
-
-    async updateQuickReply(
-    id: string,
-    data: { title: string; content: string; category?: string }
-    ) {
-    // Si no hay título nuevo → no normalizamos ni verificamos
-    if (!data.title) {
-        return this.prisma.quickReply.update({
-        where: { id },
-        data: {
-            content: data.content,
-            category: data.category,
-        },
+        return this.prisma.quickReply.create({
+            data: {
+                title: normalizedTitle,           // ← ¡Aquí se guarda el valor convertido!
+                content: data.content,
+                category: data.category || 'general',
+            },
         });
     }
 
-    const normalizedTitle = toCommandSlug(data.title);
+    async updateQuickReply(
+        id: string,
+        data: { title: string; content: string; category?: string }
+    ) {
+        // Si no hay título nuevo → no normalizamos ni verificamos
+        if (!data.title) {
+            return this.prisma.quickReply.update({
+                where: { id },
+                data: {
+                    content: data.content,
+                    category: data.category,
+                },
+            });
+        }
 
-    // Verificamos unicidad, pero excluimos el registro actual
-    const existing = await this.prisma.quickReply.findFirst({
-        where: {
-        title: normalizedTitle,
-        id: { not: id }, // ← Importante: no nos bloqueamos a nosotros mismos
-        },
-    });
+        const normalizedTitle = toCommandSlug(data.title);
 
-    if (existing) {
-        throw new Error(
-        `Ya existe otra respuesta rápida con el comando "/${normalizedTitle}".`
-        );
-    }
+        // Verificamos unicidad, pero excluimos el registro actual
+        const existing = await this.prisma.quickReply.findFirst({
+            where: {
+                title: normalizedTitle,
+                id: { not: id }, // ← Importante: no nos bloqueamos a nosotros mismos
+            },
+        });
 
-    return this.prisma.quickReply.update({
-        where: { id },
-        data: {
-        title: normalizedTitle,           // ← Actualizamos solo si hay título nuevo
-        content: data.content,
-        category: data.category,
-        },
-    });
+        if (existing) {
+            throw new Error(
+                `Ya existe otra respuesta rápida con el comando "/${normalizedTitle}".`
+            );
+        }
+
+        return this.prisma.quickReply.update({
+            where: { id },
+            data: {
+                title: normalizedTitle,           // ← Actualizamos solo si hay título nuevo
+                content: data.content,
+                category: data.category,
+            },
+        });
     }
 
     async deleteQuickReply(id: string) {

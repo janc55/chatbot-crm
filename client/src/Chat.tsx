@@ -19,7 +19,7 @@ interface QuickReply {
 }
 
 const Chat: React.FC = () => {
-    const { leadId } = useParams<{ leadId: string }>();
+    const { personId } = useParams<{ personId: string }>();
     const navigate = useNavigate();
     const { joinRoom, leaveRoom, sendMessage, messages: realtimeMessages } = useChat();
     const [messages, setMessages] = useState<Message[]>([]);
@@ -34,10 +34,10 @@ const Chat: React.FC = () => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
-        if (!leadId) return;
+        if (!personId) return;
 
         // Join WebSocket room
-        joinRoom(leadId);
+        joinRoom(personId);
 
         // Fetch conversation history
         fetchHistory();
@@ -48,7 +48,7 @@ const Chat: React.FC = () => {
         return () => {
             leaveRoom();
         };
-    }, [leadId]);
+    }, [personId]);
 
     useEffect(() => {
         // Append realtime messages to the list
@@ -66,7 +66,7 @@ const Chat: React.FC = () => {
 
     const fetchHistory = async () => {
         try {
-            const response = await axios.get(`http://localhost:3000/chat/history/${leadId}`);
+            const response = await axios.get(`http://localhost:3000/persons/${personId}/messages`);
             setMessages(response.data);
         } catch (error) {
             console.error('Error fetching history:', error);
@@ -85,7 +85,7 @@ const Chat: React.FC = () => {
     const fetchSuggestions = async () => {
         setLoadingSuggestions(true);
         try {
-            const response = await axios.get(`http://localhost:3000/chat/suggest/${leadId}`);
+            const response = await axios.get(`http://localhost:3000/chat/suggest/${personId}`);
             setSuggestions(response.data.suggestions || []);
         } catch (error) {
             console.error('Error fetching suggestions:', error);
@@ -156,12 +156,12 @@ const Chat: React.FC = () => {
             <div className="max-w-4xl mx-auto">
                 <div className="mb-4 flex items-center justify-between">
                     <button
-                        onClick={() => navigate('/leads')}
+                        onClick={() => navigate('/persons')}
                         className="text-blue-600 hover:text-blue-800"
                     >
-                        ← Back to Leads
+                        ← Back to Persons
                     </button>
-                    <h1 className="text-2xl font-bold">Chat - Lead {leadId?.substring(0, 8)}</h1>
+                    <h1 className="text-2xl font-bold">Chat - {personId?.substring(0, 8)}</h1>
                 </div>
 
                 {/* Messages */}

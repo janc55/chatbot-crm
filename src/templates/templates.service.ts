@@ -111,8 +111,16 @@ export class TemplatesService implements OnModuleInit {
         });
     }
 
-    async findByKey(key: string): Promise<Template | null> {
-        return this.prisma.template.findUnique({ where: { key } });
+    async findByKey(key: string, tenantId?: string): Promise<Template | null> {
+        return this.prisma.template.findFirst({
+            where: {
+                key,
+                OR: [
+                    { tenantId },
+                    { tenantId: null } // Fallback to global templates
+                ]
+            }
+        });
     }
 
     async getContextSummary(): Promise<string> {

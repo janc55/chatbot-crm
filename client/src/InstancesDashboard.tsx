@@ -30,7 +30,7 @@ export default function InstancesDashboard() {
     const fetchInstances = async () => {
         try {
             setLoading(true);
-            const response = await api.get(`/webhook/whatsapp/instances?tenantId=${user?.tenantId}`);
+            const response = await api.get('/webhook/whatsapp/instances');
             setInstances(response.data);
         } catch (error) {
             console.error('Error fetching instances:', error);
@@ -47,7 +47,6 @@ export default function InstancesDashboard() {
         try {
             setCreating(true);
             await api.post('/webhook/whatsapp/instances', {
-                tenantId: user?.tenantId,
                 name: newInstanceName
             });
             toast.success('Instancia creada');

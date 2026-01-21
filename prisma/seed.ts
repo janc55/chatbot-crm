@@ -34,21 +34,33 @@ async function main() {
     });
     console.log(`Admin user created/found: ${admin.email}`);
 
-    // 3. Link existing data to the new tenant (Optional but recommended for cleanliness)
-    await prisma.lead.updateMany({
-        where: { tenantId: null },
-        data: { tenantId: tenant.id },
-    });
+    // 3. Seed Default Pipeline Stages
+    const defaults = [
+        { name: 'new', displayName: 'Nuevo', order: 1, color: '#3B82F6' },
+        { name: 'contacted', displayName: 'Contactado', order: 2, color: '#F59E0B' },
+        { name: 'qualified', displayName: 'Calificado', order: 3, color: '#10B981' },
+        { name: 'proposal', displayName: 'Propuesta Enviada', order: 4, color: '#8B5CF6' },
+        { name: 'negotiation', displayName: 'Negociación', order: 5, color: '#EC4899' },
+        { name: 'won', displayName: 'Ganado', order: 6, color: '#059669', isFinal: true },
+        { name: 'lost', displayName: 'Perdido', order: 7, color: '#DC2626', isFinal: true },
+    ];
 
-    await prisma.template.updateMany({
-        where: { tenantId: null },
-        data: { tenantId: tenant.id },
-    });
-
-    await prisma.setting.updateMany({
-        where: { tenantId: null },
-        data: { tenantId: tenant.id },
-    });
+    for (const stage of defaults) {
+        await prisma.pipelineStage.upsert({
+            where: {
+                name_tenantId: {
+                    name: stage.name,
+                    tenantId: tenant.id,
+                },
+            },
+            update: {},
+            create: {
+                ...stage,
+                tenantId: tenant.id,
+            },
+        });
+    }
+    console.log('Default pipeline stages seeded.');
 
     console.log('Seed completed successfully.');
 }

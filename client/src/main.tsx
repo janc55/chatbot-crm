@@ -3,8 +3,8 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './Layout';
 import Dashboard from './Dashboard';
-import Leads from './Leads';
-import LeadDetail from './LeadDetail';
+import Persons from './Persons';
+import PersonDetail from './PersonDetail';
 import Templates from './Templates';
 import Settings from './Settings';
 import Logs from './Logs';
@@ -46,8 +46,8 @@ function AppContent() {
         </ProtectedRoute>
       }>
         <Route index element={<Dashboard />} />
-        <Route path="leads" element={<Leads />} />
-        <Route path="leads/:id" element={<LeadDetail />} />
+        <Route path="persons" element={<Persons />} />
+        <Route path="persons/:id" element={<PersonDetail />} />
         <Route path="quick-replies" element={<QuickReplies />} />
         <Route path="templates" element={<Templates />} />
 

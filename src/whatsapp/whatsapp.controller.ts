@@ -1,9 +1,12 @@
-import { Controller, Post, Body, Get, Delete, Param, Query, NotFoundException, HttpCode, Inject, forwardRef } from '@nestjs/common';
+import { Controller, Post, Body, Get, Delete, Param, Query, NotFoundException, HttpCode, Inject, forwardRef, UseGuards, Req } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { BaileysService } from './baileys.service';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('Whatsapp')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('webhook/whatsapp')
 export class WhatsappController {
     constructor(
@@ -26,8 +29,9 @@ export class WhatsappController {
 
     @Post('instances')
     @ApiOperation({ summary: 'Create a new WhatsApp instance for a tenant' })
-    async createInstance(@Body() body: { tenantId: string, name: string }) {
-        return this.whatsappService.createInstance(body.tenantId, body.name);
+    async createInstance(@Req() req: any, @Body() body: { name: string }) {
+        const tenantId = req.user.tenantId;
+        return this.whatsappService.createInstance(tenantId, body.name);
     }
 
     @Delete('instances/:id')
@@ -38,7 +42,8 @@ export class WhatsappController {
 
     @Get('instances')
     @ApiOperation({ summary: 'List WhatsApp instances for a tenant' })
-    async listInstances(@Query('tenantId') tenantId: string) {
+    async listInstances(@Req() req: any) {
+        const tenantId = req.user.tenantId;
         return this.whatsappService.getInstances(tenantId);
     }
 

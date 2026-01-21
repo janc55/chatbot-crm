@@ -7,27 +7,29 @@ export class InteractionsService {
     constructor(private prisma: PrismaService) { }
 
     async logInteraction(data: {
-        leadId: string;
+        personId: string;
         direction: Direction;
         messageType: MessageType;
         content: string;
         templateKey?: string;
         usedAi?: boolean;
     }) {
-        return this.prisma.interaction.create({ data });
+        return this.prisma.interaction.create({ data: data as any });
     }
 
-    async getDailyStats() {
+    async getDailyStats(tenantId: string) {
         // Agrupar por día (YYYY-MM-DD) y contar inputs vs outputs
-        // PostgreSQL specific
+        // PostgreSQL specific, filter by tenantId from the person relation
         const result = await this.prisma.$queryRaw`
             SELECT 
-                DATE(created_at) as date, 
-                direction,
+                DATE(i.created_at) as date, 
+                i.direction,
                 COUNT(*) as count 
-            FROM interactions 
-            GROUP BY DATE(created_at), direction 
-            ORDER BY DATE(created_at) ASC
+            FROM interactions i
+            JOIN persons p ON i.person_id = p.id
+            WHERE p.tenant_id = ${tenantId}
+            GROUP BY DATE(i.created_at), i.direction 
+            ORDER BY DATE(i.created_at) ASC
             LIMIT 30;
         `;
 

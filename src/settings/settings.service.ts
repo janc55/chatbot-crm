@@ -33,12 +33,18 @@ export class SettingsService implements OnModuleInit {
     }
   }
 
-  async getAllSettings(): Promise<Record<string, string>> {
-    const settings = await this.prisma.setting.findMany();
+  async getAllSettings(tenantId?: string): Promise<Record<string, string>> {
+    const settings = await this.prisma.setting.findMany({
+      where: tenantId ? { tenantId } : {}
+    });
     return settings.reduce((acc, setting) => {
       acc[setting.key] = setting.value;
       return acc;
     }, {});
+  }
+
+  async getAllTenants() {
+    return this.prisma.tenant.findMany();
   }
 
   async getSetting(key: string): Promise<string | null> {
@@ -56,9 +62,9 @@ export class SettingsService implements OnModuleInit {
     });
   }
 
-  async getChatbotSettings(): Promise<ChatbotSettings> {
+  async getChatbotSettings(tenantId?: string): Promise<ChatbotSettings> {
     try {
-      const settings = await this.getAllSettings();
+      const settings = await this.getAllSettings(tenantId);
 
       return {
         messageDelayEnabled: settings['messageDelayEnabled'] !== 'false', // Default true

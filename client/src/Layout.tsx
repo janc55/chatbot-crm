@@ -35,8 +35,8 @@ export default function Layout() {
     // Estilos comunes para los links del sidebar
     const navItemClass = (path: string) => `
         flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group
-        ${isActive(path) 
-            ? 'bg-[#0c4a6f] text-white shadow-lg shadow-[#0c4a6f]/20' 
+        ${isActive(path)
+            ? 'bg-[#0c4a6f] text-white shadow-lg shadow-[#0c4a6f]/20'
             : 'text-gray-500 hover:bg-gray-100 hover:text-[#0c4a6f]'}
     `;
 
@@ -76,17 +76,8 @@ export default function Layout() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const formatTimestamp = (timestamp: string) => {
-        return new Date(timestamp).toLocaleString('es-ES', {
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
-
     const handleNotificationClick = (leadId: string) => {
-        navigate(`/leads/${leadId}`);
+        navigate(`/persons/${leadId}`);
         setShowNotifications(false);
     };
 
@@ -98,30 +89,30 @@ export default function Layout() {
             {isLogoutModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     {/* Overlay oscuro */}
-                    <div 
+                    <div
                         className="absolute inset-0 bg-[#0c4a6f]/20 backdrop-blur-sm"
                         onClick={() => setIsLogoutModalOpen(false)}
                     ></div>
-                    
+
                     {/* Caja del Modal */}
                     <div className="relative bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 text-center animate-in fade-in zoom-in duration-200">
                         <div className="size-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
                             <span className="material-symbols-outlined text-3xl">logout</span>
                         </div>
-                        
+
                         <h3 className="text-xl font-extrabold text-[#111518] mb-2">¿Cerrar sesión ahora?</h3>
                         <p className="text-gray-500 text-sm mb-8 leading-relaxed">
                             Tendrás que volver a ingresar tus credenciales para acceder a tu panel de Nettidev.
                         </p>
-                        
+
                         <div className="flex flex-col gap-3">
-                            <button 
+                            <button
                                 onClick={logout}
                                 className="w-full py-3.5 bg-red-500 text-white rounded-2xl font-medium text-sm hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
                             >
                                 Sí, cerrar sesión
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setIsLogoutModalOpen(false)}
                                 className="w-full py-3.5 bg-gray-50 text-gray-500 rounded-2xl font-medium text-sm hover:bg-gray-100 transition-colors"
                             >
@@ -137,11 +128,11 @@ export default function Layout() {
                     {/* Logo */}
                     <div className="flex items-center gap-3 mb-10 px-2">
                         <div className="size-10 bg-[#0c4a6f] rounded-xl flex items-center justify-center text-white shrink-0">
-                                <img
-                                    src="/images/nettidev.svg"
-                                    alt="Logo"
-                                    className="h-10 w-10 object-contain p-1"
-                                />
+                            <img
+                                src="/images/nettidev.svg"
+                                alt="Logo"
+                                className="h-10 w-10 object-contain p-1"
+                            />
                         </div>
                         <div className="overflow-hidden">
                             <h1 className="text-[#111518] text-lg font-extrabold leading-none truncate">Nettidev</h1>
@@ -155,7 +146,7 @@ export default function Layout() {
                             <span className="material-symbols-outlined">dashboard</span>
                             <span className="text-sm font-medium">Dashboard</span>
                         </Link>
-                        <Link to="/leads" className={navItemClass('/leads')}>
+                        <Link to="/persons" className={navItemClass('/persons')}>
                             <span className="material-symbols-outlined">groups</span>
                             <span className="text-sm font-medium">Leads</span>
                         </Link>
@@ -193,8 +184,8 @@ export default function Layout() {
                             <span className="material-symbols-outlined">settings</span>
                             <span className="text-sm font-medium">Configuración</span>
                         </Link>
-                        <button 
-                            onClick={() => setIsLogoutModalOpen(true)} 
+                        <button
+                            onClick={() => setIsLogoutModalOpen(true)}
                             className="flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-colors"
                         >
                             <span className="material-symbols-outlined">logout</span>
@@ -209,9 +200,9 @@ export default function Layout() {
                 <header className="h-20 bg-white/80 backdrop-blur-md border-b border-gray-100 px-8 flex items-center justify-between sticky top-0 z-20">
                     <div className="flex-1 max-w-lg relative">
                         <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">search</span>
-                        <input 
-                            type="text" 
-                            placeholder="Buscar leads o mensajes..." 
+                        <input
+                            type="text"
+                            placeholder="Buscar leads o mensajes..."
                             className="w-full bg-gray-50 border-none rounded-2xl pl-12 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-[#0c4a6f]/10 transition-all"
                         />
                     </div>
@@ -219,7 +210,7 @@ export default function Layout() {
                     <div className="flex items-center gap-3">
                         {/* Notificaciones */}
                         <div className="relative" ref={notificationRef}>
-                            <button 
+                            <button
                                 onClick={() => setShowNotifications(!showNotifications)}
                                 className="size-10 flex items-center justify-center bg-gray-50 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors relative"
                             >
@@ -245,7 +236,7 @@ export default function Layout() {
 
                         {/* Perfil */}
                         <div className="relative ml-2" ref={profileRef}>
-                            <button 
+                            <button
                                 onClick={() => setShowProfile(!showProfile)}
                                 className="flex items-center gap-3 p-1.5 pr-4 rounded-2xl hover:bg-gray-50 transition-all border border-transparent hover:border-gray-100"
                             >
@@ -257,19 +248,19 @@ export default function Layout() {
                                     <span className="text-[10px] font-medium text-[#89c540] uppercase">{user?.role}</span>
                                 </div>
                             </button>
-                            
+
                             {showProfile && (
                                 <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden py-2">
                                     <div className="px-4 py-3 border-b border-gray-50 mb-1">
                                         <p className="text-sm font-medium truncate">{user?.fullName}</p>
                                         <p className="text-[10px] text-gray-400 font-medium truncate">{user?.email}</p>
                                     </div>
-                                    <button onClick={() => navigate('/leads')} className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">Mis Leads</button>
-                                    <button 
+                                    <button onClick={() => navigate('/persons')} className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">Mis Contactos</button>
+                                    <button
                                         onClick={() => {
                                             setShowProfile(false);
                                             setIsLogoutModalOpen(true);
-                                        }} 
+                                        }}
                                         className="w-full text-left px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 flex items-center gap-3 transition-colors"
                                     >
                                         <span className="material-symbols-outlined text-lg">logout_variant</span>

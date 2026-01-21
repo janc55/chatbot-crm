@@ -9,37 +9,70 @@ datasource db {
 
 
 
-model Lead {
+model Person {
   id              String        @id @default(uuid())
+  
+  // Contact Information
   phone           String
   fullName        String?       @map("full_name")
-  careerInterest  String?       @map("career_interest")
-  source          String        @default("unknown")
+  email           String?
+  company         String?       // Or "Institution" for academic context
+  
+  // CRM Lifecycle
+  type            PersonType    @default(LEAD)
+  source          LeadSource    @default(WHATSAPP)
+  sourceDetails   String?       @map("source_details") // URL, campaign ID, etc.
+  
+  // Qualification & Scoring
+  score           Int           @default(0)
+  quality         LeadQuality   @default(UNQUALIFIED)
+  
+  // Sales Pipeline (customizable per tenant)
+  pipelineStageId String?       @map("pipeline_stage_id")
+  pipelineStage   PipelineStage? @relation(fields: [pipelineStageId], references: [id])
+  
+  // Legacy field for backward compatibility
   status          LeadStatus    @default(NUEVO)
+  careerInterest  String?       @map("career_interest")
+  
+  // Assignment
+  assignedToId    String?       @map("assigned_to_id")
+  assignedTo      User?         @relation("AssignedPersons", fields: [assignedToId], references: [id])
+  
+  // Handover
+  isHandoverActive Boolean      @default(false) @map("is_handover_active")
+  
+  // Timestamps
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
-  isHandoverActive Boolean      @default(false) @map("is_handover_active")
+  convertedAt     DateTime?     @map("converted_at") // When Lead→Contact or Contact→Customer
+  
+  // Relationships
+  tenantId        String        @map("tenant_id")
+  tenant          Tenant        @relation(fields: [tenantId], references: [id])
   interactions    Interaction[]
-  tenantId        String?       @map("tenant_id")
-  tenant          Tenant?       @relation(fields: [tenantId], references: [id])
-
-  @@map("leads")
+  tags            PersonTag[]
+  notes           Note[]
+  
   @@unique([phone, tenantId])
+  @@map("persons")
+  @@index([type, tenantId])
+  @@index([pipelineStageId])
 }
-
 
 model Interaction {
   id          String          @id @default(uuid())
-  leadId      String          @map("lead_id")
+  personId    String          @map("person_id")
   direction   Direction
   messageType MessageType     @map("message_type")
   content     String
   templateKey String?         @map("template_key")
   usedAi      Boolean         @default(false) @map("used_ai")
   createdAt   DateTime        @default(now()) @map("created_at")
-  lead        Lead            @relation(fields: [leadId], references: [id])
+  person      Person          @relation(fields: [personId], references: [id], onDelete: Cascade)
 
   @@map("interactions")
+  @@index([personId, createdAt])
 }
 
 model Template {
@@ -80,11 +113,13 @@ model Tenant {
   subscriptionPlan    String             @default("FREE") @map("subscription_plan")
   createdAt           DateTime           @default(now()) @map("created_at")
   users               User[]
-  leads               Lead[]
+  persons             Person[]
   templates           Template[]
   settings            Setting[]
   quickReplies        QuickReply[]
   whatsappInstances   WhatsappInstance[]
+  pipelineStages      PipelineStage[]
+  tags                Tag[]
 
   @@map("tenants")
 }
@@ -114,8 +149,101 @@ model User {
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  
+  assignedPersons Person[] @relation("AssignedPersons")
+  notes           Note[]
 
   @@map("users")
+}
+
+model PipelineStage {
+  id          String    @id @default(uuid())
+  name        String    // e.g., "new", "contacted"
+  displayName String    @map("display_name")
+  description String?
+  color       String    @default("#3B82F6")
+  order       Int
+  isFinal     Boolean   @default(false) @map("is_final")
+  
+  tenantId    String    @map("tenant_id")
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  persons     Person[]
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  @@unique([name, tenantId])
+  @@map("pipeline_stages")
+}
+
+model Tag {
+  id        String      @id @default(uuid())
+  name      String    
+  color     String      @default("#3B82F6")
+  category  String      @default("general")
+  
+  tenantId  String      @map("tenant_id")
+  tenant    Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  persons   PersonTag[]
+  
+  createdAt DateTime    @default(now()) @map("created_at")
+  
+  @@unique([name, tenantId])
+  @@map("tags")
+}
+
+model PersonTag {
+  personId  String   @map("person_id")
+  tagId     String   @map("tag_id")
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  @@id([personId, tagId])
+  @@map("person_tags")
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  content   String
+  
+  personId  String   @map("person_id")
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  
+  authorId  String   @map("author_id")
+  author    User     @relation(fields: [authorId], references: [id])
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  @@map("notes")
+  @@index([personId])
+}
+
+enum PersonType {
+  LEAD
+  CONTACT
+  CUSTOMER
+}
+
+enum LeadSource {
+  WHATSAPP
+  WEB_FORM
+  FACEBOOK
+  INSTAGRAM
+  MANUAL
+  IMPORT
+  REFERRAL
+  OTHER
+}
+
+enum LeadQuality {
+  UNQUALIFIED
+  COLD
+  WARM
+  HOT
 }
 
 enum Role {

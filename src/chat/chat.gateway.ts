@@ -28,23 +28,23 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     @SubscribeMessage('join_room')
-    handleJoinRoom(client: Socket, leadId: string) {
-        client.join(`lead_${leadId}`);
-        this.logger.log(`Client ${client.id} joined room: lead_${leadId}`);
-        return { event: 'joined', data: leadId };
+    handleJoinRoom(client: Socket, personId: string) {
+        client.join(`person_${personId}`);
+        this.logger.log(`Client ${client.id} joined room: person_${personId}`);
+        return { event: 'joined', data: personId };
     }
 
     @SubscribeMessage('leave_room')
-    handleLeaveRoom(client: Socket, leadId: string) {
-        client.leave(`lead_${leadId}`);
-        this.logger.log(`Client ${client.id} left room: lead_${leadId}`);
-        return { event: 'left', data: leadId };
+    handleLeaveRoom(client: Socket, personId: string) {
+        client.leave(`person_${personId}`);
+        this.logger.log(`Client ${client.id} left room: person_${personId}`);
+        return { event: 'left', data: personId };
     }
 
     // Method to emit new messages to all clients in a room
-    emitMessageToRoom(leadId: string, message: any) {
-        console.log('Gateway: Emitting message to room lead_' + leadId, message);
-        this.server.to(`lead_${leadId}`).emit('receive_message', message);
-        this.logger.log(`Message emitted to room lead_${leadId}`);
+    emitMessageToRoom(personId: string, message: any) {
+        console.log('Gateway: Emitting message to room person_' + personId, message);
+        this.server.to(`person_${personId}`).emit('receive_message', message);
+        this.logger.log(`Message emitted to room person_${personId}`);
     }
 }
