@@ -83,7 +83,6 @@ export default function Layout() {
 
     return (
         <div className="flex min-h-screen bg-[#f8fafc] font-sans">
-            <Toaster position="top-right" />
 
             {/* MODAL DE CONFIRMACIÓN DE LOGOUT */}
             {isLogoutModalOpen && (

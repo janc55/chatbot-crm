@@ -67,7 +67,7 @@ export default function Templates() {
 
     // Formatear nombres de categoría para mostrar
     const formatCategoryName = (category: string): string => {
-        return category.split('_').map(word => 
+        return category.split('_').map(word =>
             word.charAt(0).toUpperCase() + word.slice(1)
         ).join(' ');
     };
@@ -314,57 +314,76 @@ export default function Templates() {
                 )}
             </div>
 
-            <div className="grid gap-6">
-                {filteredTemplates.length === 0 ? (
-                    <div className="bg-white shadow sm:rounded-lg p-6 text-center">
-                        <p className="text-gray-500">No se encontraron templates con los filtros seleccionados.</p>
+            {/* Grid de Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Botón "Create from Scratch" dinámico */}
+                <div
+                    onClick={() => setIsModalOpen(true)}
+                    className="border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center p-12 hover:border-[#A7CF3B] hover:bg-white transition-all cursor-pointer group"
+                >
+                    <div className="w-12 h-12 rounded-full border-2 border-gray-300 flex items-center justify-center mb-4 group-hover:border-[#A7CF3B]">
+                        <span className="text-2xl text-gray-400 group-hover:text-[#A7CF3B]">+</span>
                     </div>
-                ) : (
-                    filteredTemplates.map(tpl => (
-                    <div key={tpl.id} className="bg-white shadow sm:rounded-lg p-6">
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 className="text-lg leading-6 font-medium text-gray-900">{tpl.key}</h3>
-                                <div className="flex flex-wrap gap-2 mt-1">
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                        {formatCategoryName(tpl.category)}
-                                    </span>
-                                    {extractCareer(tpl.key) && (
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            {formatCareerName(extractCareer(tpl.key)!)}
-                                        </span>
-                                    )}
-                                </div>
+                    <span className="text-gray-500 font-semibold group-hover:text-[#064A6F]">Create from Scratch</span>
+                </div>
+
+                {filteredTemplates.map(tpl => (
+                    <div key={tpl.id} className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 flex flex-col h-full hover:shadow-xl transition-shadow relative group">
+                        {/* Header de la Card */}
+                        <div className="flex justify-between items-start mb-6">
+                            <div className="p-3 bg-blue-50 rounded-xl">
+                                <svg className="w-6 h-6 text-[#064A6F]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                                </svg>
                             </div>
-                            {editingId !== tpl.id && (
-                                <button onClick={() => handleEdit(tpl)} className="text-[#064A6F] hover:text-[#0a5a87] text-sm font-medium">Edit</button>
-                            )}
+                            <span className={`flex items-center text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest ${tpl.followUpSuggested ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full mr-2 ${tpl.followUpSuggested ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                                {tpl.followUpSuggested ? 'Live' : 'Draft'}
+                            </span>
                         </div>
 
-                        {editingId === tpl.id ? (
-                            <div className="space-y-4">
+                        {/* Contenido */}
+                        <div className="flex-grow">
+                            <h3 className="text-xl font-bold text-gray-900 mb-3">{tpl.key}</h3>
+                            <p className="text-gray-400 text-sm leading-relaxed line-clamp-3 italic">
+                                "{tpl.content}"
+                            </p>
+                        </div>
+
+                        {/* Footer de la Card */}
+                        <div className="mt-8 pt-4 border-t border-gray-50 flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
+                                {formatCategoryName(tpl.category)}
+                            </span>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => handleEdit(tpl)}
+                                    className="p-2 text-gray-400 hover:text-[#064A6F] hover:bg-gray-50 rounded-lg transition-all"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                </button>
+                                <button className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Overlay de Edición Rápida (Solo si está editando) */}
+                        {editingId === tpl.id && (
+                            <div className="absolute inset-0 bg-white rounded-3xl z-10 p-6 flex flex-col">
                                 <textarea
-                                    className="block w-full shadow-sm sm:text-sm focus:ring-[#064A6F] focus:border-[#064A6F] border-gray-300 rounded-md"
-                                    rows={4}
+                                    className="w-full flex-grow p-4 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#A7CF3B] outline-none text-sm mb-4"
                                     value={editForm.content}
                                     onChange={e => setEditForm({ ...editForm, content: e.target.value })}
                                 />
-                                <div className="flex justify-end space-x-3">
-                                    <button onClick={() => setEditingId(null)} className="px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</button>
-                                    <button onClick={handleSave} className="px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-[#064A6F] bg-[#A7CF3B] hover:bg-[#b8d85a]">Save</button>
+                                <div className="flex justify-end gap-2">
+                                    <button onClick={() => setEditingId(null)} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button>
+                                    <button onClick={handleSave} className="px-4 py-2 bg-[#A7CF3B] text-[#064A6F] rounded-xl text-xs font-bold">Save Changes</button>
                                 </div>
-                            </div>
-                        ) : (
-                            <p className="text-gray-700 whitespace-pre-wrap">{tpl.content}</p>
-                        )}
-                        {tpl.attachments && (
-                            <div className="mt-2 text-xs text-gray-500 font-mono">
-                                Attachments: {tpl.attachments}
                             </div>
                         )}
                     </div>
-                    ))
-                )}
+                ))}
             </div>
         </div>
     );

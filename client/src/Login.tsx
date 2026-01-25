@@ -76,9 +76,9 @@ const Login: React.FC = () => {
                                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-[#0c4a6f]/5 focus:border-[#0c4a6f] placeholder:text-gray-300 font-medium transition-all"
                             />
                             <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400 hover:text-gray-600"
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400 hover:text-gray-600"
                             >
                                 <span className="material-symbols-outlined text-[22px] select-none">
                                     {showPassword ? 'visibility_off' : 'visibility'}
